@@ -1,0 +1,16 @@
+# Secrets — the Anthropic/LLM key lives here and must never be committed
+proxy/.env
+*.env
+!*.env.example
+
+# Python
+proxy/.venv/
+**/__pycache__/
+*.pyc
+
+# Xcode / iOS build artifacts (project is generated from ios/project.yml)
+ios/UmrahCompanion.xcodeproj/
+ios/build/
+ios/DerivedData/
+*.xcuserstate
+.DS_Store

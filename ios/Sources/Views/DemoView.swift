@@ -1,0 +1,129 @@
+import SwiftUI
+
+/// The one demo screen. Camera fills the background; a big legible overlay shows
+/// ritual progress and the assistant state. High contrast, large touch targets,
+/// VoiceOver-labeled, and fully multi-language with right-to-left support.
+struct DemoView: View {
+    @StateObject private var vm: CompanionViewModel
+    @State private var showLaunch = true
+
+    init(proxyBaseURL: URL) {
+        _vm = StateObject(wrappedValue: CompanionViewModel(proxyBaseURL: proxyBaseURL))
+    }
+
+    private let gold = Color(red: 0.83, green: 0.68, blue: 0.33)
+    private let ink = Color.black.opacity(0.55)
+
+    var body: some View {
+        ZStack {
+            ARViewContainer(viewModel: vm).ignoresSafeArea()
+
+            VStack {
+                topBar
+                statusBanner
+                Spacer()
+                if vm.phase == .tawaf || vm.phase == .complete { circuitRing }
+                Spacer()
+                controls
+            }
+            .padding()
+        }
+        .environment(\.layoutDirection, vm.lang.layoutDirection)   // RTL for Arabic/Urdu
+        .overlay { if showLaunch { LaunchView(l: vm.l).transition(.opacity) } }
+        .onAppear { vm.onAppear() }
+        .task {
+            try? await Task.sleep(nanoseconds: 1_800_000_000)
+            withAnimation(.easeOut(duration: 0.6)) { showLaunch = false }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    // MARK: pieces
+    private var topBar: some View {
+        HStack {
+            Menu {
+                ForEach(Lang.allCases) { lg in
+                    Button(lg.nativeName) { vm.setLanguage(lg) }
+                }
+            } label: {
+                Label(vm.lang.nativeName, systemImage: "globe")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(ink, in: Capsule()).foregroundStyle(.white)
+            }
+            Spacer()
+            if vm.speech.isSpeaking {
+                Image(systemName: "waveform").symbolEffect(.variableColor).foregroundStyle(gold)
+                    .font(.title3)
+            }
+        }
+    }
+
+    private var statusBanner: some View {
+        HStack(spacing: 10) {
+            Circle().fill(vm.trackingOK ? .green : .orange).frame(width: 10, height: 10)
+            Text(vm.statusLine)
+                .font(.headline).foregroundStyle(.white)
+                .lineLimit(2).minimumScaleFactor(0.7)
+            Spacer()
+        }
+        .padding(14)
+        .background(ink, in: RoundedRectangle(cornerRadius: 16))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var circuitRing: some View {
+        ZStack {
+            Circle().stroke(.white.opacity(0.2), lineWidth: 16)
+            Circle()
+                .trim(from: 0, to: CGFloat(vm.circuits) / 7 + CGFloat(vm.circuitProgress) / 7)
+                .stroke(gold, style: StrokeStyle(lineWidth: 16, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.easeInOut, value: vm.circuits)
+            VStack(spacing: 2) {
+                Text(vm.l.num(vm.circuits))
+                    .font(.system(size: 68, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                Text(vm.l.ofSevenCircuits).font(.title3).foregroundStyle(.white.opacity(0.85))
+            }
+        }
+        .frame(width: 220, height: 220)
+        .accessibilityLabel("\(vm.circuits) / 7")
+        .accessibilityValue(vm.phase == .complete ? vm.l.tawafComplete : "")
+    }
+
+    private var controls: some View {
+        VStack(spacing: 14) {
+            if let o = vm.nearestObstacle, let d = o.distanceM {
+                Label(vm.l.obstacleChip(o.direction, d), systemImage: "figure.walk.motion")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(10)
+                    .background(.red.opacity(0.85), in: Capsule())
+                    .foregroundStyle(.white)
+            }
+
+            HStack(spacing: 14) {
+                switch vm.phase {
+                case .idle, .markingCenter:
+                    bigButton(vm.l.markButton, "scope", gold) { vm.markCenter() }
+                case .tawaf:
+                    bigButton(vm.speech.isListening ? vm.l.listening : vm.l.askButton,
+                              "mic.fill", .blue) { vm.askAboutScene() }
+                case .complete:
+                    bigButton(vm.l.startAgain, "arrow.counterclockwise", gold) { vm.restart() }
+                }
+            }
+        }
+    }
+
+    private func bigButton(_ title: String, _ icon: String, _ tint: Color,
+                           action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.title3.weight(.bold))
+                .frame(maxWidth: .infinity).frame(height: 62)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(tint)
+        .accessibilityHint(title)
+    }
+}

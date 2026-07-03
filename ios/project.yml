@@ -1,0 +1,41 @@
+# XcodeGen spec. After installing Xcode:  brew install xcodegen && cd ios && xcodegen generate && open UmrahCompanion.xcodeproj
+name: UmrahCompanion
+options:
+  bundleIdPrefix: com.sourav
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    TARGETED_DEVICE_FAMILY: "1"          # iPhone only
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+    GENERATE_INFOPLIST_FILE: NO
+targets:
+  UmrahCompanion:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sourav.umrahcompanion
+        # In Xcode: Signing & Capabilities -> pick your personal Apple ID team.
+        # DEVELOPMENT_TEAM: XXXXXXXXXX
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Umrah Companion
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIRequiredDeviceCapabilities:
+          - arkit
+        NSCameraUsageDescription: "The camera lets your companion see your surroundings and guide you during Tawaf."
+        NSMicrophoneUsageDescription: "The microphone lets you talk to your companion assistant."
+        NSSpeechRecognitionUsageDescription: "Speech recognition understands your spoken questions."
+        NSLocalNetworkUsageDescription: "Connects to the local companion service running on your Mac during the demo."
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true    # allows plain http to your Mac's LAN IP during the demo
