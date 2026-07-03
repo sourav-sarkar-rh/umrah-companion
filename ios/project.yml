@@ -21,8 +21,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sourav.umrahcompanion
-        # In Xcode: Signing & Capabilities -> pick your personal Apple ID team.
-        # DEVELOPMENT_TEAM: XXXXXXXXXX
+        CODE_SIGN_STYLE: Automatic
+        # Sourav's free personal Apple ID team (souravmathlover@gmail.com).
+        # This is the cert's OU / Team ID — not a secret. Survives xcodegen regen.
+        DEVELOPMENT_TEAM: "7F8WQJP8H6"
     info:
       path: Sources/Info.plist
       properties:
