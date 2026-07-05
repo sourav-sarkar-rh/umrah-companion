@@ -6,10 +6,64 @@
 > other disabilities, other iPhone-Pro capabilities, and the blind-iOS design
 > patterns that should be reused when building any of it.
 >
-> Two parts:
+> Three parts:
 > - **Part A — Future feature roadmap** (new use cases beyond blind-Tawaf).
 > - **Part B — Blind/low-vision iOS design reference** (the patterns that already
 >   informed F17 circle-guidance + F20 voice; reuse them for future modalities).
+> - **Part C — Near-term build backlog** (small, concrete items surfaced by
+>   session-8 device testing + the Part-B patterns we designed but haven't shipped).
+>   This is the "next PR" list, NOT the aspirational roadmap.
+
+---
+
+# Part C — Near-term build backlog (post-demo, small + concrete)
+
+> Added 2026-07-05 after Sourav's device test (session 8). These are polish/finish
+> items on the EXISTING blind-Tawaf/Sa'i slice — not new modalities (those are Part
+> A). Ordered by leverage. **Build-freeze recommendation: do NONE of these before
+> the hackathon** — see the note at the end of this part.
+
+## C1. Deferred by session 8 (re-open after the demo)
+- **Re-enable + harden the scene Q&A.** It's gated off by
+  `DemoTuning.sceneAnswerEnabled=false`, not deleted. Flip back on, then make the
+  on-device answer robust (it was the flakiest thing live). This is the natural
+  home for the **Point-and-ask scene narrator** (Part A #3) via Camera Control.
+- **Field-tune the new Sa'i guidance thresholds** (`DemoTuning.saiReverseThreshold`,
+  `saiOffPathFraction`, `saiOffPathFloorM`). Set by reasoning, not by walking —
+  verify they're neither twitchy nor sluggish on a real back-and-forth.
+- **Du'a: swap TTS for real reciter audio.** Recite mode currently uses the system
+  voice on the du'a text; a recorded qārī clip is far more appropriate and was
+  always the intended production path (noted in the `duaRecite` doc-comment).
+
+## C2. Designed in Part B but NOT yet in the build (the real gaps)
+- **Haptics (Core Haptics) — entirely absent.** Part B2 specifies the full pattern
+  vocabulary (on-path tick, drift buzz, turn transients, milestone/complete). None
+  is implemented. This is the biggest missing channel for a deafblind-capable and
+  eyes-/ears-free experience, and it's self-contained. **Caveat from B2/B3:** test
+  haptics while the mic + audio beacon are live — Core Haptics can contend with an
+  active record session.
+- **Earcons.** No listening-start ping / processing / success / not-understood
+  sounds (Part B3). Cheap to add, big perceived-polish gain for voice control.
+- **Callouts on/off + verbosity dial** (Part B: "the first thing users disable").
+  There's a warnings mute, but no independent guidance-verbosity control.
+
+## C3. Bigger, still-on-the-existing-slice
+- **Wake word** (on-device keyword spotting) as the hands-free ideal, with the
+  current double-tap/magic-tap as the noisy-crowd fallback (Part B3).
+- **`.playAndRecord` + echo-cancelled input** so the beacon keeps playing *during*
+  listening, instead of stopping/resuming around the mic (Part B3 upgrade path).
+- **Scholar validation of the liturgical rules layer** (start/stop lines, counting,
+  sequencing) — non-negotiable before any real pilgrim use (Part A5).
+
+## C4. Build-freeze note (hackathon)
+**Build-wise, the demo is done.** The demo definition (blind Tawaf + Sa'i on the
+phone) is met: both rituals count, orient, warn, and self-correct; voice controls
+it; du'a and languages work. Everything left above is polish or new scope. Adding
+features now trades directly against the **Feasibility 20%** score — a crisp,
+reliable demo beats an ambitious one that stutters. The remaining pre-demo work is
+NOT coding: **(1)** run the session-8 device-verify queue in `STATUS.md`, **(2)**
+tune to taste, **(3)** rehearse the narration (lead with the blind pilgrim + "runs
+entirely on-device, offline"). Touch Part C only after the hackathon.
 
 ---
 
