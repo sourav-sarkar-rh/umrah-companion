@@ -2,6 +2,51 @@
 
 _Update this at the end of every session. Newest at top._
 
+## 2026-07-05 (session 6 — committed the baseline; added Tawaf circle-guidance F17)
+**Git hygiene first.** Sessions 4–5 were all *uncommitted* working-tree changes. Committed the
+device-verified "everything works" state as the revert point (`d381166`), then built F17 in two
+commits so any of it can be rolled back independently.
+
+**Scene-description "unable to connect" = STALE BUILD, not a bug.** At HEAD, the on-device
+`answer()` never touches the network; `L10n.networkFallback` and `ProxyClient.describe` are dead
+code (grep confirms zero callers). The phone was running a build from *before* the session-5b
+on-device rewrite. **Fix: rebuild/reinstall current tree to the device** — "what's around me" then
+works fully offline, no proxy, no key.
+
+**F17 Tawaf circle-guidance — the "count → guide" upgrade (Sourav's core insight: the demo-runner
+can see, the blind pilgrim can't).**
+- `Sources/AR/TawafGuide.swift` — pure (simd/Foundation only). From position + camera-forward it
+  emits `state` (acquiring/onPath/driftingIn/driftingOut/reversing), a signed `steer` [-1,1], an
+  `onAxis` flag, and signed `radiusError`. Heading vs radial drift are **separate outputs** (the
+  two-independent-errors principle from the blind-nav research). **Orbit radius is learned** from the
+  first ~30 moving samples — no hard-coded distance, works table- or Mataf-scale like the tracker.
+- `Tests/guide/main.swift` — **9/9 pass** headlessly: good CCW walk >90% onPath; outward/inward
+  spirals flagged correctly; clockwise = reversing; facing backwards = large steer/off-axis; radius
+  learned at both 0.7 m and 5 m. Run: `cd ios && swiftc Sources/AR/TawafGuide.swift Tests/guide/main.swift -o /tmp/guidesim && /tmp/guidesim`.
+- `Sources/Services/GuidanceAudio.swift` — one `AVAudioSourceNode` synthesises a **stereo-panned
+  beacon tick** (pan follows steer), an **on-axis confirmation tone**, and a **separate low
+  radial-drift earcon** (pitch up = too close / down = too far). No audio files. Session:
+  `.playback + [.mixWithOthers, .duckOthers]` to layer with TTS.
+- Wiring (`CompanionViewModel`): guide fed each frame during `.tawaf`; `speakGuidance()` gives terse
+  egocentric corrections on state-change/cooldown (speech = discrete events, beacon = continuous);
+  **OFF by default** (`guidanceOn`), top-bar toggle (`figure.walk.circle`), **auto-stops while the
+  mic listens** (frees the audio session) and resumes after. On-screen `guidanceBanner` for the
+  sighted demo-runner / low-vision.
+- **Verified headlessly:** 9/9 guide tests, tracker + Sai sims still green, full app **builds green on
+  `iPhone 17 Pro,OS=26.5`**, launches + initialises without crashing (perm prompt fires).
+- **Device-verify (Sourav's leg):** turn on the walk-guidance toggle → mark the table → **close your
+  eyes / blindfold** → confirm the beacon + spoken cues actually walk you around it; confirm pan
+  direction feels right (flip `GuidanceAudio.panFollowsSteerNegated` / `TawafGuide.steerIsLeftWhenPositive`
+  if inverted), tune `onAxisToleranceRad`, `radialToleranceFraction`, beacon `beaconRate`/amps, and
+  the reverse threshold. Check the beacon coexists with TTS and ducks correctly; confirm it pauses on
+  "ask what's around me" and resumes.
+
+**Next (my queue, per the agreed priority):** (2) voice command layer — double-tap-anywhere-to-talk
++ on-device intent map, UI buttons kept as fallback; (3) wire the tested `SaiTracker` in as a ritual
+*mode* (no nav stack) with linear guidance; (4) du'a (default off, 3-state, safety-priority). Two
+research reports (iPhone-Pro roadmap across disabilities; blind-iOS guidance/voice patterns) are in
+this session's chat — fold into a future-roadmap doc.
+
 ## 2026-07-04 (session 5 — Batch A verified on device; Batch B: YOLO wired + voice bug fixed)
 **Device-verified (Sourav, on iPhone 16 Pro / iOS 26.5):** Kaaba cube + gold band renders on the table; LiDAR debug mesh overlay works; circuit counting + circuit voice work; screen stays awake.
 

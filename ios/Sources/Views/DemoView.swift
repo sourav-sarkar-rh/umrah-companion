@@ -22,6 +22,7 @@ struct DemoView: View {
             VStack {
                 topBar
                 statusBanner
+                if vm.guidanceOn && (vm.phase == .tawaf) { guidanceBanner }
                 if !vm.detections.isEmpty { detectionReadout }
                 Spacer()
                 if vm.phase == .tawaf || vm.phase == .complete { circuitRing }
@@ -71,6 +72,15 @@ struct DemoView: View {
             }
             .accessibilityLabel(vm.warningsMuted ? "Unmute obstacle warnings" : "Mute obstacle warnings")
 
+            Button { vm.toggleGuidance() } label: {
+                Image(systemName: vm.guidanceOn ? "figure.walk.circle.fill" : "figure.walk.circle")
+                    .font(.title3)
+                    .foregroundStyle(vm.guidanceOn ? gold : .white.opacity(0.7))
+                    .padding(8)
+                    .background(ink, in: Circle())
+            }
+            .accessibilityLabel(vm.guidanceOn ? vm.l.guideOffLabel : vm.l.guideOnLabel)
+
             Button { vm.toggleDebug() } label: {
                 Image(systemName: vm.debugMesh ? "cube.transparent.fill" : "cube.transparent")
                     .font(.title3)
@@ -80,6 +90,20 @@ struct DemoView: View {
             }
             .accessibilityLabel("Toggle LiDAR debug view")
         }
+    }
+
+    /// Compact walk-guidance readout during Tawaf (sighted demo-runner + low-vision).
+    private var guidanceBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: vm.guidanceState == .onPath ? "checkmark.circle.fill" : "arrow.triangle.turn.up.right.circle.fill")
+                .foregroundStyle(vm.guidanceState == .onPath ? .green : gold)
+            Text(vm.l.guidanceLabel(vm.guidanceState, steerLeft: vm.guidanceSteerLeft))
+                .font(.headline).foregroundStyle(.white)
+            Spacer()
+        }
+        .padding(12)
+        .background(ink, in: RoundedRectangle(cornerRadius: 14))
+        .accessibilityHidden(true)   // the beacon + spoken cues cover this non-visually
     }
 
     private var statusBanner: some View {

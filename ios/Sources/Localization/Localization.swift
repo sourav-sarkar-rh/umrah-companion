@@ -110,6 +110,63 @@ struct L10n {
         }
     }
 
+    // MARK: Tawaf circle-guidance (spoken — terse + egocentric per blind-nav research)
+    /// Spoken heading nudge. `left` = bear left, else bear right.
+    func bearCue(left: Bool) -> String {
+        switch (lang, left) {
+        case (.en, true):  return "Bear a little left."
+        case (.en, false): return "Bear a little right."
+        case (.ar, true):  return "مِل قليلًا إلى اليسار."
+        case (.ar, false): return "مِل قليلًا إلى اليمين."
+        case (.ur, true):  return "تھوڑا بائیں مڑیں۔"
+        case (.ur, false): return "تھوڑا دائیں مڑیں۔"
+        }
+    }
+    var driftInSpoken: String {
+        switch lang {
+        case .en: "You're drifting toward the Kaaba. Ease outward."
+        case .ar: "أنت تقترب من الكعبة. ابتعد قليلًا."
+        case .ur: "آپ کعبہ کی طرف بڑھ رہے ہیں۔ ذرا باہر ہو جائیں۔"
+        }
+    }
+    var driftOutSpoken: String {
+        switch lang {
+        case .en: "You're drifting too far out. Ease inward."
+        case .ar: "أنت تبتعد كثيرًا. اقترب قليلًا."
+        case .ur: "آپ بہت باہر جا رہے ہیں۔ ذرا اندر آ جائیں۔"
+        }
+    }
+    var reversingSpoken: String {
+        switch lang {
+        case .en: "Wrong way. Turn around and keep the Kaaba on your left."
+        case .ar: "الاتجاه خاطئ. استدر واجعل الكعبة على يسارك."
+        case .ur: "غلط سمت۔ مڑ جائیں اور کعبہ کو اپنی بائیں طرف رکھیں۔"
+        }
+    }
+    var backOnPathSpoken: String {
+        switch lang {
+        case .en: "Good. You're back on the path."
+        case .ar: "جيد. عدت إلى المسار."
+        case .ur: "اچھا۔ آپ دوبارہ راستے پر ہیں۔"
+        }
+    }
+    /// Compact on-screen guidance line (for the sighted demo-runner / low-vision).
+    func guidanceLabel(_ state: TawafGuide.State, steerLeft: Bool) -> String {
+        switch (lang, state) {
+        case (_, .onPath):     return lang == .en ? "On the path" : (lang == .ar ? "على المسار" : "راستے پر")
+        case (_, .acquiring):  return lang == .en ? "Finding your orbit…" : (lang == .ar ? "جارٍ تحديد المسار…" : "مدار تلاش ہو رہا ہے…")
+        case (_, .driftingIn): return lang == .en ? "Too close — ease out" : (lang == .ar ? "قريب جدًا — ابتعد" : "بہت قریب — باہر ہوں")
+        case (_, .driftingOut):return lang == .en ? "Too far — ease in" : (lang == .ar ? "بعيد جدًا — اقترب" : "بہت دور — اندر آئیں")
+        case (_, .reversing):  return lang == .en ? "Wrong way" : (lang == .ar ? "اتجاه خاطئ" : "غلط سمت")
+        }
+    }
+    var guideOnLabel: String {
+        switch lang { case .en: "Turn on walk guidance"; case .ar: "تشغيل إرشاد المشي"; case .ur: "چلنے کی رہنمائی آن کریں" }
+    }
+    var guideOffLabel: String {
+        switch lang { case .en: "Turn off walk guidance"; case .ar: "إيقاف إرشاد المشي"; case .ur: "چلنے کی رہنمائی بند کریں" }
+    }
+
     func circuitDone(_ n: Int) -> String {
         switch lang {
         case .en: "Circuit \(num(n)) of seven complete."

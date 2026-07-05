@@ -32,8 +32,15 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
     @Published var lang: Lang = .en
     var l: L10n { L10n(lang: lang) }
 
+    /// Walk-guidance for a blind pilgrim (off by default — see `guidanceOn`).
+    @Published var guidanceOn = false
+    @Published var guidanceState: TawafGuide.State = .acquiring
+    @Published var guidanceSteerLeft = true
+
     let speech = SpeechService()
     private let tracker = TawafTracker()
+    private let guide = TawafGuide()
+    let guidanceAudio = GuidanceAudio()
     private let vision = SceneVision()
     private let proxy: ProxyClient
 
@@ -41,6 +48,8 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
     private var kaabaAnchor: AnchorEntity?
     private var frameCounter = 0
     private var lastObstacleSpoken = Date.distantPast
+    private var lastGuidanceState: TawafGuide.State?
+    private var lastGuidanceCue = Date.distantPast
     private var pendingCenterTap = false
 
     init(proxyBaseURL: URL) {
@@ -118,6 +127,10 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
 
     func restart() {
         tracker.reset()
+        guide.reset()
+        guidanceAudio.stop()
+        lastGuidanceState = nil
+        guidanceState = .acquiring
         circuits = 0; circuitProgress = 0
         nearestObstacle = nil
         detections = []
@@ -127,9 +140,46 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
         statusLine = l.markPrompt
     }
 
+    /// Turn walk-guidance on/off. Starts/stops the continuous beacon; only audible
+    /// while actually walking (phase == .tawaf).
+    func toggleGuidance() {
+        guidanceOn.toggle()
+        if guidanceOn, phase == .tawaf { guidanceAudio.start() }
+        else { guidanceAudio.stop() }
+    }
+
+    /// Speak a terse, egocentric correction on state change or after a cooldown.
+    /// Continuous nuance lives in the beacon; speech is for discrete events only.
+    private func speakGuidance(_ g: TawafGuide.Guidance) {
+        let now = Date()
+        let changed = g.state != lastGuidanceState
+        let prev = lastGuidanceState
+        defer { lastGuidanceState = g.state }
+        guard g.state != .acquiring else { return }
+        let minGap: TimeInterval = 3
+        let due = changed || now.timeIntervalSince(lastGuidanceCue) > minGap
+        switch g.state {
+        case .reversing where due:
+            lastGuidanceCue = now; speech.speak(l.reversingSpoken, interrupting: false)
+        case .driftingIn where due:
+            lastGuidanceCue = now; speech.speak(l.driftInSpoken, interrupting: false)
+        case .driftingOut where due:
+            lastGuidanceCue = now; speech.speak(l.driftOutSpoken, interrupting: false)
+        case .onPath:
+            if changed, let p = prev, p != .acquiring {
+                speech.speak(l.backOnPathSpoken, interrupting: false)
+            } else if !g.onAxis, abs(g.steer) > 0.5, due {
+                lastGuidanceCue = now
+                speech.speak(l.bearCue(left: g.steer > 0), interrupting: false)
+            }
+        default: break
+        }
+    }
+
     func askAboutScene() {
         // Tap while already listening = stop and send what was heard.
         if speech.isListening { speech.finishListening(); return }
+        guidanceAudio.stop()          // free the audio session for the mic
         speech.startListening { [weak self] heard in
             guard let self else { return }
             Task { await self.answer(question: heard) }
@@ -155,11 +205,14 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
                 let t = q.worldTransform.columns.3
                 let center = SIMD3<Float>(t.x, t.y, t.z)
                 tracker.setCenter(worldPosition: center)
+                guide.setCenter(SIMD2(center.x, center.z))
+                lastGuidanceState = nil
                 placeKaaba(at: center)
                 pendingCenterTap = false
                 phase = .tawaf
                 statusLine = l.beginWalking
                 speech.speak(l.beginTawafSpoken)
+                if guidanceOn { guidanceAudio.start() }
             }
         }
 
@@ -171,11 +224,25 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
                     phase = .complete
                     statusLine = l.tawafComplete
                     speech.speak(l.tawafFinishedSpoken)
+                    guidanceAudio.stop()
                 } else {
                     speech.speak(l.circuitDone(completed))
                 }
             }
             circuitProgress = tracker.fractionOfCurrent
+
+            // Circle-guidance: where the pilgrim is aimed + orbit drift.
+            if guidanceOn {
+                let m = frame.camera.transform
+                let camPos = SIMD2<Float>(cam.x, cam.z)
+                let fwd = SIMD2<Float>(-m.columns.2.x, -m.columns.2.z)   // camera forward, on the floor
+                if let gd = guide.update(position: camPos, forward: fwd) {
+                    guidanceAudio.update(gd)
+                    guidanceState = gd.state
+                    guidanceSteerLeft = gd.steer > 0     // steer>0 ⇒ bear left (guide default)
+                    if !speech.isListening { speakGuidance(gd) }
+                }
+            }
         }
 
         frameCounter += 1
@@ -207,6 +274,7 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
         let text = l.sceneDescription(Array(obs.prefix(4)))
         lastAssistantText = text
         speech.speak(text)
+        if guidanceOn, phase == .tawaf { guidanceAudio.start() }   // resume the beacon
     }
 
     private func refreshStatus() {

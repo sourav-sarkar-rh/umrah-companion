@@ -28,6 +28,12 @@ Legend: ✅ done · 🟡 in progress · ⬜ todo · 🔮 later (post-demo)
 - 🟡 **F6 Voice I/O** — on-device STT (push-to-talk) + TTS narration (scaffolded).
 - 🟡 **F7 First build** — Xcode 26.6 (Swift 6.3.3, iOS 26.5 SDK); full app **compiles + runs on the iPhone 17 Pro / iOS 26.5 simulator** (Build Succeeded, signed). Device destination ("Sourav's iPhone") now eligible after `xcodebuild -downloadPlatform iOS`; `DEVELOPMENT_TEAM` set. Device build (real AR + first-launch permissions) still pending — that's the human's leg.
 - ⬜ **F8 On-device tuning** — circuit threshold at table radius; obstacle cadence; tracking-loss UX.
+- 🟡 **F17 Tawaf circle-guidance (blind-usable)** — `TawafGuide` (pure, 9/9 headless tests) reports
+  on-path / drifting-in / drifting-out / reversing + a signed steer + on-axis flag + radius error,
+  learning the orbit radius from the first steps. `GuidanceAudio` synthesises a Soundscape-style
+  panned beacon + on-axis confirmation tone + a separate radial-drift earcon (no audio assets).
+  Terse egocentric spoken corrections. OFF by default, toggle in the top bar, auto-pauses while the
+  mic listens. **Logic verified headlessly; beacon + AR steering are device-verify (blindfold walk).**
 - 🟡 **F9 Live cloud path** — Anthropic key in `proxy/.env`; proxy→Claude verified live (English + Arabic). Phone→proxy leg pending F7.
 
 ### Polish (v0.1 — nicer demo)
