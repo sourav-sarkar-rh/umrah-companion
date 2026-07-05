@@ -74,6 +74,9 @@ struct L10n {
     var markButton: String {
         switch lang { case .en: "Mark the Kaaba"; case .ar: "تحديد الكعبة"; case .ur: "کعبہ متعین کریں" }
     }
+    var markHereButton: String {
+        switch lang { case .en: "Mark this spot"; case .ar: "تحديد هذا الموضع"; case .ur: "یہ جگہ متعین کریں" }
+    }
     var askButton: String {
         switch lang { case .en: "Ask what's around me"; case .ar: "ماذا حولي؟"; case .ur: "میرے اردگرد کیا ہے؟" }
     }
@@ -107,6 +110,89 @@ struct L10n {
         case .en: "I cannot reach the network right now. The path ahead looks clear."
         case .ar: "لا يمكنني الاتصال بالشبكة الآن. يبدو الطريق أمامك خاليًا."
         case .ur: "ابھی نیٹ ورک دستیاب نہیں۔ آگے کا راستہ صاف لگتا ہے۔"
+        }
+    }
+
+    // MARK: Ritual selection + Sa'i
+    var chooseRitual: String {
+        switch lang {
+        case .en: "Choose your ritual: Tawaf or Sa'i."
+        case .ar: "اختر النسك: طواف أو سعي."
+        case .ur: "اپنی عبادت منتخب کریں: طواف یا سعی۔"
+        }
+    }
+    var tawafName: String {
+        switch lang { case .en: "Tawaf"; case .ar: "طواف"; case .ur: "طواف" }
+    }
+    var saiName: String {
+        switch lang { case .en: "Sa'i"; case .ar: "سعي"; case .ur: "سعی" }
+    }
+    var holdSteady: String {
+        switch lang {
+        case .en: "Hold steady…"
+        case .ar: "ثبّت الكاميرا…"
+        case .ur: "کیمرہ کو مستحکم رکھیں…"
+        }
+    }
+    var markSafaPrompt: String {
+        switch lang {
+        case .en: "Point at the start, Safa, then tap to mark it."
+        case .ar: "وجّه الكاميرا نحو الصفا ثم اضغط لتحديده."
+        case .ur: "صفا کی طرف کیمرہ کریں، پھر متعین کرنے کے لیے دبائیں۔"
+        }
+    }
+    var markMarwahPrompt: String {
+        switch lang {
+        case .en: "Now point at the far end, Marwah, and tap."
+        case .ar: "الآن وجّه الكاميرا نحو المروة واضغط."
+        case .ur: "اب دوسرے سرے مروہ کی طرف کیمرہ کریں اور دبائیں۔"
+        }
+    }
+    var beginSaiSpoken: String {
+        switch lang {
+        case .en: "Both ends marked. Begin your Sa'i. Walk toward Marwah."
+        case .ar: "تم تحديد الطرفين. ابدأ السعي. اتجه نحو المروة."
+        case .ur: "دونوں سرے متعین ہو گئے۔ سعی شروع کریں۔ مروہ کی طرف چلیں۔"
+        }
+    }
+    var saiComplete: String {
+        switch lang { case .en: "Sa'i complete."; case .ar: "اكتمل السعي."; case .ur: "سعی مکمل ہو گئی۔" }
+    }
+    var saiFinishedSpoken: String {
+        switch lang {
+        case .en: "Your seventh length is complete. Your Sa'i is finished. May it be accepted."
+        case .ar: "اكتمل شوطك السابع. تمّ سعيك، تقبّل الله."
+        case .ur: "آپ کا ساتواں چکر مکمل ہوا۔ آپ کی سعی مکمل ہوئی۔ اللہ قبول فرمائے۔"
+        }
+    }
+    var ofSevenLengths: String {
+        switch lang { case .en: "of 7 lengths"; case .ar: "من ٧ أشواط"; case .ur: "۷ چکروں میں سے" }
+    }
+    private func endName(_ e: SaiTracker.End) -> String {
+        switch (lang, e) {
+        case (.en, .safa): "Safa";  case (.en, .marwah): "Marwah"
+        case (.ar, .safa): "الصفا"; case (.ar, .marwah): "المروة"
+        case (.ur, .safa): "صفا";   case (.ur, .marwah): "مروہ"
+        }
+    }
+    func headToward(_ e: SaiTracker.End, l: L10n) -> String {
+        switch lang {
+        case .en: "Head toward \(endName(e))."
+        case .ar: "اتجه نحو \(endName(e))."
+        case .ur: "\(endName(e)) کی طرف چلیں۔"
+        }
+    }
+    func lengthDone(_ n: Int, headTo target: SaiTracker.End?, l: L10n) -> String {
+        let turn: String
+        switch lang {
+        case .en: turn = target != nil ? " Turn around, head toward \(endName(target!))." : ""
+        case .ar: turn = target != nil ? " استدر واتجه نحو \(endName(target!))." : ""
+        case .ur: turn = target != nil ? " مڑ جائیں، \(endName(target!)) کی طرف چلیں۔" : ""
+        }
+        switch lang {
+        case .en: return "Length \(num(n)) of seven complete.\(turn)"
+        case .ar: return "اكتمل الشوط \(num(n)) من سبعة.\(turn)"
+        case .ur: return "\(num(n)) واں چکر مکمل ہوا، سات میں سے۔\(turn)"
         }
     }
 

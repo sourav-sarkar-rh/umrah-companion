@@ -22,10 +22,10 @@ struct DemoView: View {
             VStack {
                 topBar
                 statusBanner
-                if vm.guidanceOn && (vm.phase == .tawaf) { guidanceBanner }
+                if vm.guidanceOn && (vm.phase == .tawaf || vm.phase == .sai) { guidanceBanner }
                 if !vm.detections.isEmpty { detectionReadout }
                 Spacer()
-                if vm.phase == .tawaf || vm.phase == .complete { circuitRing }
+                if vm.phase == .tawaf || vm.phase == .sai || vm.phase == .complete { circuitRing }
                 Spacer()
                 controls
             }
@@ -145,20 +145,23 @@ struct DemoView: View {
         ZStack {
             Circle().stroke(.white.opacity(0.2), lineWidth: 16)
             Circle()
-                .trim(from: 0, to: CGFloat(vm.circuits) / 7 + CGFloat(vm.circuitProgress) / 7)
+                .trim(from: 0, to: CGFloat(vm.count) / 7 + CGFloat(vm.circuitProgress) / 7)
                 .stroke(gold, style: StrokeStyle(lineWidth: 16, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(.easeInOut, value: vm.circuits)
+                .animation(.easeInOut, value: vm.count)
             VStack(spacing: 2) {
-                Text(vm.l.num(vm.circuits))
+                Text(vm.l.num(vm.count))
                     .font(.system(size: 68, weight: .bold, design: .rounded)).foregroundStyle(.white)
-                Text(vm.l.ofSevenCircuits).font(.title3).foregroundStyle(.white.opacity(0.85))
+                Text(vm.ritual == .tawaf ? vm.l.ofSevenCircuits : vm.l.ofSevenLengths)
+                    .font(.title3).foregroundStyle(.white.opacity(0.85))
             }
         }
         .frame(width: 220, height: 220)
-        .accessibilityLabel("\(vm.circuits) / 7")
-        .accessibilityValue(vm.phase == .complete ? vm.l.tawafComplete : "")
+        .accessibilityLabel("\(vm.count) / 7")
+        .accessibilityValue(vm.phase == .complete ? (vm.ritual == .tawaf ? vm.l.tawafComplete : vm.l.saiComplete) : "")
     }
+
+    private var markLabel: String { vm.ritual == .tawaf ? vm.l.markButton : vm.l.markHereButton }
 
     private var controls: some View {
         VStack(spacing: 14) {
@@ -172,9 +175,12 @@ struct DemoView: View {
 
             HStack(spacing: 14) {
                 switch vm.phase {
-                case .idle, .markingCenter:
-                    bigButton(vm.l.markButton, "scope", gold) { vm.markCenter() }
-                case .tawaf:
+                case .idle:
+                    bigButton(vm.l.tawafName, "circle.circle", gold) { vm.selectRitual(.tawaf) }
+                    bigButton(vm.l.saiName, "arrow.left.arrow.right", .green) { vm.selectRitual(.sai) }
+                case .marking, .markingSecond:
+                    bigButton(markLabel, "scope", gold) { vm.markCenter() }
+                case .tawaf, .sai:
                     bigButton(vm.speech.isListening ? vm.l.listening : vm.l.askButton,
                               "mic.fill", .blue) { vm.askAboutScene() }
                 case .complete:

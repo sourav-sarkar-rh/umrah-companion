@@ -4,17 +4,26 @@ import RealityKit
 import Combine
 import UIKit
 
-/// The demo's brain. Owns the ARSession, feeds each frame to the Tawaf tracker
-/// and the on-device vision, drives spoken guidance, and calls the cloud proxy
+/// The demo's brain. Owns the ARSession, feeds each frame to the ritual tracker
+/// (Tawaf or Sa'i) and the on-device vision, drives spoken guidance, and answers
 /// on demand. Everything the UI shows is @Published here. Fully multi-language:
-/// UI text, voice, and cloud replies all follow `lang`.
+/// UI text and voice follow `lang`.
+///
+/// Two rituals share one screen as a MODE, not a navigation stack (screen-to-screen
+/// nav is hostile to blind users — see the blind-iOS research). `ritual` picks the
+/// mode; the phase machine drives both.
 @MainActor
 final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
 
-    enum Phase { case idle, markingCenter, tawaf, complete }
+    enum Ritual { case tawaf, sai }
+    /// idle → (Tawaf) marking → tawaf → complete
+    /// idle → (Sa'i) marking[Safa] → markingSecond[Marwah] → sai → complete
+    enum Phase { case idle, marking, markingSecond, tawaf, sai, complete }
 
+    @Published var ritual: Ritual = .tawaf
     @Published var phase: Phase = .idle
-    @Published var circuits = 0
+    /// Completed units of the current ritual: Tawaf circuits or Sa'i lengths.
+    @Published var count = 0
     @Published var circuitProgress: Float = 0
     @Published var trackingOK = false
     @Published var statusLine = ""
@@ -40,22 +49,30 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
     let speech = SpeechService()
     private let tracker = TawafTracker()
     private let guide = TawafGuide()
+    private let saiTracker = SaiTracker()
     let guidanceAudio = GuidanceAudio()
     private let vision = SceneVision()
     private let proxy: ProxyClient
 
     private weak var arView: ARView?
     private var kaabaAnchor: AnchorEntity?
+    private var saiAnchors: [AnchorEntity] = []
+    private var safaPoint: SIMD3<Float>?
+    private var marwahPoint: SIMD3<Float>?
+    private var lastSaiTarget: SaiTracker.End?
     private var frameCounter = 0
     private var lastObstacleSpoken = Date.distantPast
     private var lastGuidanceState: TawafGuide.State?
     private var lastGuidanceCue = Date.distantPast
-    private var pendingCenterTap = false
+    private var pendingMark = false
+
+    /// The ring shows units out of 7 for both rituals.
+    let ritualTotal = 7
 
     init(proxyBaseURL: URL) {
         self.proxy = ProxyClient(baseURL: proxyBaseURL)
         super.init()
-        statusLine = l.markPrompt
+        statusLine = l.chooseRitual
     }
 
     func onAppear() {
@@ -119,34 +136,69 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
         kaabaAnchor = anchor
     }
 
+    /// A slim glowing pillar to mark a Sa'i endpoint (green = Safa, gold = Marwah).
+    private func placeSaiMarker(at world: SIMD3<Float>, isSafa: Bool) {
+        guard let arView else { return }
+        let anchor = AnchorEntity(world: world)
+        let color: UIColor = isSafa
+            ? UIColor(red: 0.28, green: 0.72, blue: 0.42, alpha: 1)
+            : UIColor(red: 0.83, green: 0.68, blue: 0.33, alpha: 1)
+        let pillar = ModelEntity(
+            mesh: .generateBox(width: 0.12, height: 0.6, depth: 0.12, cornerRadius: 0.02),
+            materials: [SimpleMaterial(color: color, isMetallic: true)])
+        pillar.position.y = 0.3
+        anchor.addChild(pillar)
+        arView.scene.addAnchor(anchor)
+        saiAnchors.append(anchor)
+    }
+
+    // MARK: Ritual selection + marking
+    /// Pick a ritual from the idle screen (button or voice), then start marking.
+    func selectRitual(_ r: Ritual) {
+        guard phase == .idle else { return }
+        ritual = r
+        phase = .marking
+        statusLine = (r == .tawaf) ? l.markPrompt : l.markSafaPrompt
+        speech.speak(statusLine)
+    }
+
+    /// Perform the next mark (tap or voice "mark"). Meaning depends on ritual/phase:
+    /// Tawaf → the Kaaba center; Sa'i → Safa, then Marwah.
     func markCenter() {
-        pendingCenterTap = true
-        phase = .markingCenter
-        statusLine = l.holdTable
+        guard phase == .marking || phase == .markingSecond else { return }
+        pendingMark = true
+        statusLine = l.holdSteady
     }
 
     func restart() {
         tracker.reset()
         guide.reset()
+        saiTracker.reset()
         guidanceAudio.stop()
         lastGuidanceState = nil
         guidanceState = .acquiring
-        circuits = 0; circuitProgress = 0
+        lastSaiTarget = nil
+        safaPoint = nil; marwahPoint = nil
+        count = 0; circuitProgress = 0
         nearestObstacle = nil
         detections = []
         kaabaAnchor.map { arView?.scene.removeAnchor($0) }
         kaabaAnchor = nil
+        saiAnchors.forEach { arView?.scene.removeAnchor($0) }
+        saiAnchors = []
         phase = .idle
-        statusLine = l.markPrompt
+        statusLine = l.chooseRitual
     }
 
     /// Turn walk-guidance on/off. Starts/stops the continuous beacon; only audible
-    /// while actually walking (phase == .tawaf).
+    /// while actually walking a ritual.
     func toggleGuidance() {
         guidanceOn.toggle()
-        if guidanceOn, phase == .tawaf { guidanceAudio.start() }
+        if guidanceOn, isWalking { guidanceAudio.start() }
         else { guidanceAudio.stop() }
     }
+
+    private var isWalking: Bool { phase == .tawaf || phase == .sai }
 
     /// Speak a terse, egocentric correction on state change or after a cooldown.
     /// Continuous nuance lives in the beacon; speech is for discrete events only.
@@ -199,51 +251,24 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
     }
 
     private func handle(frame: ARFrame) {
-        if pendingCenterTap, let view = arView {
+        let cam = frame.camera.transform.columns.3
+        let camPos = SIMD2<Float>(cam.x, cam.z)
+        let m = frame.camera.transform
+        let fwd = SIMD2<Float>(-m.columns.2.x, -m.columns.2.z)   // camera forward, on the floor
+
+        if pendingMark, let view = arView {
             let mid = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
             if let q = view.raycast(from: mid, allowing: .estimatedPlane, alignment: .any).first {
                 let t = q.worldTransform.columns.3
-                let center = SIMD3<Float>(t.x, t.y, t.z)
-                tracker.setCenter(worldPosition: center)
-                guide.setCenter(SIMD2(center.x, center.z))
-                lastGuidanceState = nil
-                placeKaaba(at: center)
-                pendingCenterTap = false
-                phase = .tawaf
-                statusLine = l.beginWalking
-                speech.speak(l.beginTawafSpoken)
-                if guidanceOn { guidanceAudio.start() }
+                let hit = SIMD3<Float>(t.x, t.y, t.z)
+                pendingMark = false
+                if ritual == .tawaf { beginTawaf(at: hit) }
+                else { placeSaiMark(at: hit) }
             }
         }
 
-        if phase == .tawaf {
-            let cam = frame.camera.transform.columns.3
-            if let completed = tracker.update(cameraWorldPosition: SIMD3(cam.x, cam.y, cam.z)) {
-                circuits = completed
-                if tracker.isComplete {
-                    phase = .complete
-                    statusLine = l.tawafComplete
-                    speech.speak(l.tawafFinishedSpoken)
-                    guidanceAudio.stop()
-                } else {
-                    speech.speak(l.circuitDone(completed))
-                }
-            }
-            circuitProgress = tracker.fractionOfCurrent
-
-            // Circle-guidance: where the pilgrim is aimed + orbit drift.
-            if guidanceOn {
-                let m = frame.camera.transform
-                let camPos = SIMD2<Float>(cam.x, cam.z)
-                let fwd = SIMD2<Float>(-m.columns.2.x, -m.columns.2.z)   // camera forward, on the floor
-                if let gd = guide.update(position: camPos, forward: fwd) {
-                    guidanceAudio.update(gd)
-                    guidanceState = gd.state
-                    guidanceSteerLeft = gd.steer > 0     // steer>0 ⇒ bear left (guide default)
-                    if !speech.isListening { speakGuidance(gd) }
-                }
-            }
-        }
+        if phase == .tawaf { updateTawaf(cam: cam, camPos: camPos, fwd: fwd) }
+        if phase == .sai { updateSai(camPos: camPos, fwd: fwd) }
 
         frameCounter += 1
         if frameCounter % DemoTuning.visionEveryNFrames == 0 {
@@ -262,6 +287,107 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
         }
     }
 
+    // MARK: Tawaf
+    private func beginTawaf(at center: SIMD3<Float>) {
+        tracker.setCenter(worldPosition: center)
+        guide.setCenter(SIMD2(center.x, center.z))
+        lastGuidanceState = nil
+        placeKaaba(at: center)
+        phase = .tawaf
+        statusLine = l.beginWalking
+        speech.speak(l.beginTawafSpoken)
+        if guidanceOn { guidanceAudio.start() }
+    }
+
+    private func updateTawaf(cam: SIMD4<Float>, camPos: SIMD2<Float>, fwd: SIMD2<Float>) {
+        if let completed = tracker.update(cameraWorldPosition: SIMD3(cam.x, cam.y, cam.z)) {
+            count = completed
+            if tracker.isComplete {
+                phase = .complete
+                statusLine = l.tawafComplete
+                speech.speak(l.tawafFinishedSpoken)
+                guidanceAudio.stop()
+            } else {
+                speech.speak(l.circuitDone(completed))
+            }
+        }
+        circuitProgress = tracker.fractionOfCurrent
+
+        // Circle-guidance: where the pilgrim is aimed + orbit drift.
+        if guidanceOn {
+            if let gd = guide.update(position: camPos, forward: fwd) {
+                guidanceAudio.update(gd)
+                guidanceState = gd.state
+                guidanceSteerLeft = gd.steer > 0     // steer>0 ⇒ bear left (guide default)
+                if !speech.isListening { speakGuidance(gd) }
+            }
+        }
+    }
+
+    // MARK: Sa'i
+    private func placeSaiMark(at hit: SIMD3<Float>) {
+        if phase == .marking {
+            safaPoint = hit
+            placeSaiMarker(at: hit, isSafa: true)
+            phase = .markingSecond
+            statusLine = l.markMarwahPrompt
+            speech.speak(l.markMarwahPrompt)
+        } else if phase == .markingSecond {
+            marwahPoint = hit
+            placeSaiMarker(at: hit, isSafa: false)
+            if let s = safaPoint {
+                saiTracker.setEndpoints(safa: s, marwah: hit)
+            }
+            phase = .sai
+            lastSaiTarget = nil
+            statusLine = l.beginWalking
+            speech.speak(l.beginSaiSpoken)
+            if guidanceOn { guidanceAudio.start() }
+        }
+    }
+
+    private func updateSai(camPos: SIMD2<Float>, fwd: SIMD2<Float>) {
+        if let completed = saiTracker.update(cameraWorldPosition: SIMD3(camPos.x, 0, camPos.y)) {
+            count = completed
+            if saiTracker.isComplete {
+                phase = .complete
+                statusLine = l.saiComplete
+                speech.speak(l.saiFinishedSpoken)
+                guidanceAudio.stop()
+            } else {
+                // Length done → announce and point them at the new endpoint.
+                let target = saiTracker.nextTarget
+                speech.speak(l.lengthDone(completed, headTo: target, l: l), interrupting: false)
+            }
+        }
+        circuitProgress = saiTracker.fractionOfCurrent
+
+        // Linear guidance: a beacon that pans toward the endpoint they're walking to.
+        if guidanceOn, let target = saiTracker.nextTarget,
+           let targetPoint = (target == .safa ? safaPoint : marwahPoint) {
+            let tp = SIMD2<Float>(targetPoint.x, targetPoint.z)
+            let toTarget = tp - camPos
+            let len = simd_length(toTarget)
+            if len > 0.05 {
+                let dir = toTarget / len
+                let fn = simd_length(fwd) > 1e-4 ? fwd / simd_length(fwd) : dir
+                let dot = simd_dot(fn, dir)
+                let cross = fn.x * dir.y - fn.y * dir.x
+                let steerAngle = atan2(cross, dot)
+                let steer = simd_clamp(steerAngle / (.pi / 2), -1, 1)
+                let onAxis = abs(steerAngle) <= 0.26
+                let gd = TawafGuide.Guidance(state: .onPath, steer: steer, onAxis: onAxis,
+                                             radiusError: 0, radius: len)
+                guidanceAudio.update(gd)
+                guidanceState = .onPath
+                guidanceSteerLeft = steer > 0
+                // Direction is spoken by beginSaiSpoken + lengthDone (which name the
+                // next endpoint); the beacon carries the continuous steering.
+            }
+            lastSaiTarget = target
+        }
+    }
+
     /// Answer "what's around me?" ENTIRELY ON-DEVICE — no server, no key, works
     /// offline. We already have precise object + LiDAR-distance + direction data
     /// from `SceneVision`, so we synthesize the spoken description locally.
@@ -274,15 +400,16 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
         let text = l.sceneDescription(Array(obs.prefix(4)))
         lastAssistantText = text
         speech.speak(text)
-        if guidanceOn, phase == .tawaf { guidanceAudio.start() }   // resume the beacon
+        if guidanceOn, isWalking { guidanceAudio.start() }   // resume the beacon
     }
 
     private func refreshStatus() {
         switch phase {
-        case .idle: statusLine = l.markPrompt
-        case .markingCenter: statusLine = l.holdTable
-        case .tawaf: statusLine = l.beginWalking
-        case .complete: statusLine = l.tawafComplete
+        case .idle: statusLine = l.chooseRitual
+        case .marking: statusLine = (ritual == .tawaf) ? l.markPrompt : l.markSafaPrompt
+        case .markingSecond: statusLine = l.markMarwahPrompt
+        case .tawaf, .sai: statusLine = l.beginWalking
+        case .complete: statusLine = (ritual == .tawaf) ? l.tawafComplete : l.saiComplete
         }
     }
 }
