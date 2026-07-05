@@ -117,20 +117,52 @@ struct L10n {
         case .ur: "\(num(n)) واں چکر مکمل ہوا، سات میں سے۔"
         }
     }
-    func personClose(_ dir: Observation.Direction) -> String {
+    /// Spoken obstacle warning for any detected object, e.g. "Careful, a chair is
+    /// close, 1.2 meters on your left."
+    func obstacleNear(_ label: String, _ dir: Observation.Direction, _ meters: Double) -> String {
+        let m = num1(meters)
+        let name = obstacleName(label)
         switch lang {
-        case .en: "Careful, someone is close on your \(direction(dir))."
-        case .ar: "انتبه، هناك شخص قريب على \(direction(dir))."
-        case .ur: "خیال رکھیں، کوئی آپ کی \(direction(dir)) قریب ہے۔"
+        case .en: return "Careful, \(name) is close, \(m) meters on your \(direction(dir))."
+        case .ar: return "انتبه، \(name) قريب، على بعد \(m) متر على \(direction(dir))."
+        case .ur: return "خیال رکھیں، \(name) قریب ہے، \(m) میٹر آپ کی \(direction(dir)) طرف۔"
         }
     }
-    /// Short on-screen obstacle chip, e.g. "Person 1.2 m on your left".
-    func obstacleChip(_ dir: Observation.Direction, _ meters: Double) -> String {
+    /// Short on-screen obstacle chip, e.g. "Chair · 1.2 m · left".
+    func obstacleChip(_ label: String, _ dir: Observation.Direction, _ meters: Double) -> String {
         let m = num1(meters)
-        return switch lang {
-        case .en: "Person \(m) m on your \(direction(dir))"
-        case .ar: "شخص على بعد \(m) م على \(direction(dir))"
-        case .ur: "شخص \(m) میٹر آپ کی \(direction(dir))"
+        return "\(obstacleName(label)) · \(m) m · \(direction(dir))"
+    }
+
+    /// A speakable name for a detected object. `person` gets a localized word;
+    /// other COCO labels use the English term (fine for a prototype — proper
+    /// per-language object vocab is a later polish item).
+    func obstacleName(_ label: String) -> String {
+        if label == "person" {
+            switch lang { case .en: return "someone"; case .ar: return "شخص"; case .ur: return "کوئی" }
+        }
+        return label.replacingOccurrences(of: "_", with: " ")
+    }
+
+    /// On-device "what's around me?" description, built from the objects the phone
+    /// already detected (label + LiDAR distance + direction). No cloud, no key.
+    func sceneDescription(_ obs: [Observation]) -> String {
+        let items = obs.compactMap { o -> String? in
+            guard let d = o.distanceM else { return nil }
+            return "\(obstacleName(o.label)) \(num1(d)) m \(direction(o.direction))"
+        }
+        if items.isEmpty {
+            switch lang {
+            case .en: return "The path ahead looks clear."
+            case .ar: return "يبدو الطريق أمامك خاليًا."
+            case .ur: return "آگے کا راستہ صاف لگتا ہے۔"
+            }
+        }
+        let list = items.joined(separator: lang == .en ? ", " : "، ")
+        switch lang {
+        case .en: return "Around you: \(list)."
+        case .ar: return "حولك: \(list)."
+        case .ur: return "آپ کے اردگرد: \(list)۔"
         }
     }
 

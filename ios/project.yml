@@ -18,6 +18,7 @@ targets:
     platform: iOS
     sources:
       - Sources
+      - path: models/yolov8n.mlpackage   # on-device object detector (Core ML), bundled + compiled to .mlmodelc
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sourav.umrahcompanion

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The one demo screen. Camera fills the background; a big legible overlay shows
 /// ritual progress and the assistant state. High contrast, large touch targets,
@@ -21,6 +22,7 @@ struct DemoView: View {
             VStack {
                 topBar
                 statusBanner
+                if !vm.detections.isEmpty { detectionReadout }
                 Spacer()
                 if vm.phase == .tawaf || vm.phase == .complete { circuitRing }
                 Spacer()
@@ -30,7 +32,11 @@ struct DemoView: View {
         }
         .environment(\.layoutDirection, vm.lang.layoutDirection)   // RTL for Arabic/Urdu
         .overlay { if showLaunch { LaunchView(l: vm.l).transition(.opacity) } }
-        .onAppear { vm.onAppear() }
+        .onAppear {
+            vm.onAppear()
+            UIApplication.shared.isIdleTimerDisabled = true   // never auto-lock mid-Tawaf
+        }
+        .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
         .task {
             try? await Task.sleep(nanoseconds: 1_800_000_000)
             withAnimation(.easeOut(duration: 0.6)) { showLaunch = false }
@@ -56,6 +62,23 @@ struct DemoView: View {
                 Image(systemName: "waveform").symbolEffect(.variableColor).foregroundStyle(gold)
                     .font(.title3)
             }
+            Button { vm.warningsMuted.toggle() } label: {
+                Image(systemName: vm.warningsMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .font(.title3)
+                    .foregroundStyle(vm.warningsMuted ? .red : .white.opacity(0.7))
+                    .padding(8)
+                    .background(ink, in: Circle())
+            }
+            .accessibilityLabel(vm.warningsMuted ? "Unmute obstacle warnings" : "Mute obstacle warnings")
+
+            Button { vm.toggleDebug() } label: {
+                Image(systemName: vm.debugMesh ? "cube.transparent.fill" : "cube.transparent")
+                    .font(.title3)
+                    .foregroundStyle(vm.debugMesh ? gold : .white.opacity(0.7))
+                    .padding(8)
+                    .background(ink, in: Circle())
+            }
+            .accessibilityLabel("Toggle LiDAR debug view")
         }
     }
 
@@ -70,6 +93,28 @@ struct DemoView: View {
         .padding(14)
         .background(ink, in: RoundedRectangle(cornerRadius: 16))
         .accessibilityElement(children: .combine)
+    }
+
+    /// Live "what I see" readout — the nearest detected objects with LiDAR distance.
+    private var detectionReadout: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(vm.detections.prefix(3)) { o in
+                HStack(spacing: 8) {
+                    Image(systemName: "viewfinder").font(.caption).foregroundStyle(gold)
+                    Text(vm.l.obstacleName(o.label).capitalized)
+                        .foregroundStyle(.white)
+                    Spacer(minLength: 8)
+                    if let d = o.distanceM {
+                        Text("\(vm.l.num1(d)) m").foregroundStyle(gold).monospacedDigit()
+                    }
+                }
+                .font(.subheadline.weight(.medium))
+            }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ink, in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityHidden(true)   // spoken warnings cover this for VoiceOver users
     }
 
     private var circuitRing: some View {
@@ -94,7 +139,7 @@ struct DemoView: View {
     private var controls: some View {
         VStack(spacing: 14) {
             if let o = vm.nearestObstacle, let d = o.distanceM {
-                Label(vm.l.obstacleChip(o.direction, d), systemImage: "figure.walk.motion")
+                Label(vm.l.obstacleChip(o.label, o.direction, d), systemImage: "figure.walk.motion")
                     .font(.subheadline.weight(.semibold))
                     .padding(10)
                     .background(.red.opacity(0.85), in: Capsule())

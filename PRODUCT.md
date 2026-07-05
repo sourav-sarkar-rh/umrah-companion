@@ -26,12 +26,14 @@ Legend: ✅ done · 🟡 in progress · ⬜ todo · 🔮 later (post-demo)
 - 🟡 **F4 ARKit session + center-mark raycast** — mark the table as center (scaffolded).
 - 🟡 **F5 On-device obstacle detection + LiDAR distance** — Vision human detector + depth (scaffolded).
 - 🟡 **F6 Voice I/O** — on-device STT (push-to-talk) + TTS narration (scaffolded).
-- 🟡 **F7 First build** — Xcode 26.3 installed; full app **compiles + runs on iOS 17 Pro simulator** (one fix: `return switch` in `obstacleChip`). Device build (signing + real AR) still pending — that's the human's leg.
+- 🟡 **F7 First build** — Xcode 26.6 (Swift 6.3.3, iOS 26.5 SDK); full app **compiles + runs on the iPhone 17 Pro / iOS 26.5 simulator** (Build Succeeded, signed). Device destination ("Sourav's iPhone") now eligible after `xcodebuild -downloadPlatform iOS`; `DEVELOPMENT_TEAM` set. Device build (real AR + first-launch permissions) still pending — that's the human's leg.
 - ⬜ **F8 On-device tuning** — circuit threshold at table radius; obstacle cadence; tracking-loss UX.
 - 🟡 **F9 Live cloud path** — Anthropic key in `proxy/.env`; proxy→Claude verified live (English + Arabic). Phone→proxy leg pending F7.
 
 ### Polish (v0.1 — nicer demo)
-- ⬜ **F10 YOLO object detection** — convert YOLOv8n → Core ML for richer labels beyond "person".
+- 🟡 **F10 YOLO object detection** — YOLOv8n **converted to Core ML** (`ios/models/yolov8n.mlpackage`, 80 COCO classes, on-device). Not yet added to the project / wired into `SceneVision` + HUD — that's the next build (Batch B).
+- 🟡 **F15 Virtual Kaaba in AR** — black cube + gold kiswa band anchored at the marked center (`DemoTuning.kaabaSizeM`). Compiles; device-verify pending.
+- 🟡 **F16 LiDAR debug/"Terminator" view** — toggle shows the live scene-reconstruction mesh + feature points (`showSceneUnderstanding`). Compiles; device-verify pending.
 - 🟡 **F11 Multi-language, ground-up** — runtime language switch (English/Arabic/Urdu) flips UI text,
   voice (TTS/STT locale), cloud replies, **right-to-left layout**, and Arabic-Indic numerals. Arabic
   strings written for demo (need native proofing). `Localization/Localization.swift`.

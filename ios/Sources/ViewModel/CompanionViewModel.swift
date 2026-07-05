@@ -2,6 +2,7 @@ import Foundation
 import ARKit
 import RealityKit
 import Combine
+import UIKit
 
 /// The demo's brain. Owns the ARSession, feeds each frame to the Tawaf tracker
 /// and the on-device vision, drives spoken guidance, and calls the cloud proxy
@@ -18,7 +19,14 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
     @Published var trackingOK = false
     @Published var statusLine = ""
     @Published var nearestObstacle: Observation?
+    /// The few nearest detected objects, for the on-screen "what I see" readout.
+    @Published var detections: [Observation] = []
     @Published var lastAssistantText = ""
+    /// "Terminator" debug overlay — shows the live LiDAR mesh + feature points.
+    @Published var debugMesh = false
+    /// When true, the automatic obstacle warnings stay silent (the on-screen
+    /// readout still shows). Ritual announcements + on-demand answers still speak.
+    @Published var warningsMuted = false
 
     /// Current language — drives UI text, layout direction, voice, and cloud replies.
     @Published var lang: Lang = .en
@@ -30,6 +38,7 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
     private let proxy: ProxyClient
 
     private weak var arView: ARView?
+    private var kaabaAnchor: AnchorEntity?
     private var frameCounter = 0
     private var lastObstacleSpoken = Date.distantPast
     private var pendingCenterTap = false
@@ -58,8 +67,47 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
         if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
             config.frameSemantics.insert(.sceneDepth)   // LiDAR
         }
+        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+            config.sceneReconstruction = .mesh          // LiDAR room mesh (for debug view + occlusion)
+        }
         view.session.delegate = self
         view.session.run(config)
+    }
+
+    /// Toggle the "Terminator" debug overlay: the reconstructed LiDAR mesh plus
+    /// feature points and the world origin, for showing how the phone sees the room.
+    func toggleDebug() {
+        debugMesh.toggle()
+        arView?.debugOptions = debugMesh
+            ? [.showSceneUnderstanding, .showFeaturePoints, .showWorldOrigin]
+            : []
+    }
+
+    /// Drop a virtual Kaaba (black cube + gold kiswa band) at the marked center,
+    /// resting on the surface the raycast hit. Purely cosmetic.
+    private func placeKaaba(at world: SIMD3<Float>) {
+        guard let arView else { return }
+        kaabaAnchor.map { arView.scene.removeAnchor($0) }
+
+        let side = DemoTuning.kaabaSizeM
+        let anchor = AnchorEntity(world: world)
+
+        let cube = ModelEntity(
+            mesh: .generateBox(size: side, cornerRadius: side * 0.01),
+            materials: [SimpleMaterial(color: UIColor(white: 0.03, alpha: 1), isMetallic: false)])
+        cube.position.y = side / 2   // rest on the plane the raycast hit
+
+        // Gold kiswa band around the upper third.
+        let band = ModelEntity(
+            mesh: .generateBox(width: side * 1.03, height: side * 0.14, depth: side * 1.03),
+            materials: [SimpleMaterial(color: UIColor(red: 0.83, green: 0.68, blue: 0.33, alpha: 1),
+                                       isMetallic: true)])
+        band.position.y = side * 0.72
+        cube.addChild(band)
+
+        anchor.addChild(cube)
+        arView.scene.addAnchor(anchor)
+        kaabaAnchor = anchor
     }
 
     func markCenter() {
@@ -72,11 +120,16 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
         tracker.reset()
         circuits = 0; circuitProgress = 0
         nearestObstacle = nil
+        detections = []
+        kaabaAnchor.map { arView?.scene.removeAnchor($0) }
+        kaabaAnchor = nil
         phase = .idle
         statusLine = l.markPrompt
     }
 
     func askAboutScene() {
+        // Tap while already listening = stop and send what was heard.
+        if speech.isListening { speech.finishListening(); return }
         speech.startListening { [weak self] heard in
             guard let self else { return }
             Task { await self.answer(question: heard) }
@@ -100,7 +153,9 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
             let mid = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
             if let q = view.raycast(from: mid, allowing: .estimatedPlane, alignment: .any).first {
                 let t = q.worldTransform.columns.3
-                tracker.setCenter(worldPosition: SIMD3(t.x, t.y, t.z))
+                let center = SIMD3<Float>(t.x, t.y, t.z)
+                tracker.setCenter(worldPosition: center)
+                placeKaaba(at: center)
                 pendingCenterTap = false
                 phase = .tawaf
                 statusLine = l.beginWalking
@@ -125,36 +180,33 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
 
         frameCounter += 1
         if frameCounter % DemoTuning.visionEveryNFrames == 0 {
-            let obs = vision.observations(from: frame)
-            let closest = obs.filter { ($0.distanceM ?? 99) <= DemoTuning.obstacleConsiderM }
-                             .min { ($0.distanceM ?? 99) < ($1.distanceM ?? 99) }
+            let ranked = vision.observations(from: frame)
+                .sorted { ($0.distanceM ?? 99) < ($1.distanceM ?? 99) }
+            detections = Array(ranked.prefix(4))
+
+            let closest = ranked.first { ($0.distanceM ?? 99) <= DemoTuning.obstacleConsiderM }
             nearestObstacle = closest
-            if let c = closest, (c.distanceM ?? 99) <= DemoTuning.obstacleWarnM,
-               Date().timeIntervalSince(lastObstacleSpoken) > DemoTuning.obstacleWarnCooldown {
+            if let c = closest, let d = c.distanceM, d <= DemoTuning.obstacleWarnM,
+               Date().timeIntervalSince(lastObstacleSpoken) > DemoTuning.obstacleWarnCooldown,
+               !speech.isListening, !warningsMuted {
                 lastObstacleSpoken = Date()
-                speech.speak(l.personClose(c.direction), interrupting: false)
+                speech.speak(l.obstacleNear(c.label, c.direction, d), interrupting: false)
             }
         }
     }
 
+    /// Answer "what's around me?" ENTIRELY ON-DEVICE — no server, no key, works
+    /// offline. We already have precise object + LiDAR-distance + direction data
+    /// from `SceneVision`, so we synthesize the spoken description locally.
+    /// (The cloud proxy path still exists in `ProxyClient` for richer open-ended
+    /// answers if we ever want to run it, but it's no longer required.)
     private func answer(question: String) async {
         guard let frame = arView?.session.currentFrame else { return }
         let obs = vision.observations(from: frame)
-        let img = vision.jpegBase64(from: frame)
-        let req = DescribeRequest(
-            observations: obs, language: lang.rawValue,
-            circuit: phase == .tawaf ? circuits : nil,
-            question: question.isEmpty ? nil : question,
-            imageB64: img
-        )
-        do {
-            let resp = try await proxy.describe(req)
-            lastAssistantText = resp.text
-            speech.speak(resp.text)
-        } catch {
-            lastAssistantText = l.networkFallback
-            speech.speak(l.networkFallback)
-        }
+            .sorted { ($0.distanceM ?? 99) < ($1.distanceM ?? 99) }
+        let text = l.sceneDescription(Array(obs.prefix(4)))
+        lastAssistantText = text
+        speech.speak(text)
     }
 
     private func refreshStatus() {

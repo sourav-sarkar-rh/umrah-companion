@@ -20,4 +20,9 @@ enum DemoTuning {
 
     /// Minimum gap (s) between spoken obstacle warnings, so it doesn't nag.
     static let obstacleWarnCooldown: TimeInterval = 4
+
+    /// Edge length (m) of the virtual Kaaba cube dropped at the marked center.
+    /// ~0.4 m reads well on a table; bump up for a room-scale walk. Purely
+    /// cosmetic — it does NOT affect circuit counting (that's angular).
+    static let kaabaSizeM: Float = 0.4
 }

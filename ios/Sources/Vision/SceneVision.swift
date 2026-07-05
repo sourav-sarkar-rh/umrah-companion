@@ -1,5 +1,6 @@
 import Foundation
 import Vision
+import CoreML
 import ARKit
 import CoreImage
 
@@ -12,22 +13,62 @@ import CoreImage
 final class SceneVision {
     private let ciContext = CIContext()
 
-    /// Produce structured observations for the current frame.
-    func observations(from frame: ARFrame) -> [Observation] {
-        let pixelBuffer = frame.capturedImage
-        var results: [Observation] = []
+    /// The bundled YOLOv8n object detector (80 everyday classes), loaded once.
+    /// nil if the model isn't in the bundle — we then fall back to people-only.
+    private lazy var yolo: VNCoreMLModel? = Self.loadYOLO()
 
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right, options: [:])
+    private static func loadYOLO() -> VNCoreMLModel? {
+        guard let url = Bundle.main.url(forResource: "yolov8n", withExtension: "mlmodelc") else { return nil }
+        do {
+            let model = try MLModel(contentsOf: url, configuration: MLModelConfiguration())
+            return try VNCoreMLModel(for: model)
+        } catch {
+            return nil
+        }
+    }
+
+    /// Produce structured observations for the current frame: a label, a rough
+    /// left/ahead/right direction, and a LiDAR distance for each detected thing.
+    func observations(from frame: ARFrame) -> [Observation] {
+        let depth = frame.sceneDepth?.depthMap   // LiDAR depth, if available
+        if let yolo {
+            return detectObjects(from: frame, model: yolo, depth: depth)
+        }
+        return detectPeople(from: frame, depth: depth)   // fallback if the model is missing
+    }
+
+    /// YOLO object detection → observations (person, chair, bottle, backpack, …).
+    private func detectObjects(from frame: ARFrame, model: VNCoreMLModel,
+                               depth: CVPixelBuffer?) -> [Observation] {
+        let handler = VNImageRequestHandler(cvPixelBuffer: frame.capturedImage, orientation: .right, options: [:])
+        let request = VNCoreMLRequest(model: model)
+        request.imageCropAndScaleOption = .scaleFill   // keep the full field of view for left/right
+        try? handler.perform([request])
+
+        var results: [Observation] = []
+        for case let obs as VNRecognizedObjectObservation in (request.results ?? []) {
+            guard let top = obs.labels.first, top.confidence >= 0.35 else { continue }
+            let box = obs.boundingBox
+            let cx = box.midX
+            let direction: Observation.Direction = cx < 0.4 ? .left : (cx > 0.6 ? .right : .ahead)
+            let distance = depth.flatMap { distanceMeters(at: box, depthMap: $0) }
+            results.append(Observation(label: top.identifier, direction: direction, distanceM: distance))
+        }
+        return results
+    }
+
+    /// Fallback: Apple's built-in human detector (used only if the YOLO model is absent).
+    private func detectPeople(from frame: ARFrame, depth: CVPixelBuffer?) -> [Observation] {
+        let handler = VNImageRequestHandler(cvPixelBuffer: frame.capturedImage, orientation: .right, options: [:])
         let request = VNDetectHumanRectanglesRequest()
         request.upperBodyOnly = false
         try? handler.perform([request])
 
-        let depth = frame.sceneDepth?.depthMap   // LiDAR depth, if available
+        var results: [Observation] = []
         for obs in (request.results ?? []) {
-            let box = obs.boundingBox            // normalized, origin bottom-left
+            let box = obs.boundingBox
             let cx = box.midX
-            let direction: Observation.Direction =
-                cx < 0.4 ? .left : (cx > 0.6 ? .right : .ahead)
+            let direction: Observation.Direction = cx < 0.4 ? .left : (cx > 0.6 ? .right : .ahead)
             let distance = depth.flatMap { distanceMeters(at: box, depthMap: $0) }
             results.append(Observation(label: "person", direction: direction, distanceM: distance))
         }
