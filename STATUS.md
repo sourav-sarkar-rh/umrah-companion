@@ -2,6 +2,34 @@
 
 _Update this at the end of every session. Newest at top._
 
+## 2026-07-05 (session 8 — post-test demo-hardening from Sourav's device feedback)
+Sourav tested sessions-6/7 features on-device and gave four pieces of feedback. All four addressed;
+**sim build green on iPhone 17 Pro; the four logic sims still pass. AR/audio/mic = device-verify.**
+
+1. **Dropped the scene Q&A ("claude"), kept voice COMMANDS.** New flag `DemoTuning.sceneAnswerEnabled
+   = false`. Voice still controls the app (tawaf/sai/mark/reset/guide/mute/du'a/count/help); the
+   open-ended "what's around me?" answer — the flakiest thing to show live — is off. `.describe` now
+   speaks "not available now"; `.unknown` speaks the help list. Flip the flag back to restore it.
+   Mic button relabeled "Voice command" (was "Ask what's around me").
+2. **Sa'i now has spoken guidance** (it only had a silent beacon). Mirrors Tawaf: tracks smoothed
+   progress-toward-target → **"Wrong way, turn around and head toward Marwah/Safa"** when walking away;
+   perpendicular offset from the Safa↔Marwah line → **"you've veered off the path"** when too far
+   sideways; "back on the path" on recovery. Scale-free tolerances in `DemoTuning` (fraction of the
+   marked leg length). Progress trend is wiped at each turn so it never false-fires at an endpoint.
+3. **Always-available Reset.** A secondary "Reset" button now shows during marking/tawaf/sai (not just
+   at completion), so the demo can jump between features mid-ritual without finishing. (Voice "reset"
+   already worked; this is the on-screen equivalent.)
+4. **Du'a recite mode now recites the du'a itself** — was a 2-word phrase; now the canonical Tawaf
+   supplication ("Bismillah, Allahu Akbar. Rabbana atina fid-dunya…"). NB: the du'a button is a
+   3-state toggle — tap ONCE = Prompt ("you may make your du'a"), TWICE = Recite (app says it). Sourav
+   was seeing Prompt. Safety still interrupts a recitation; single ayah so it never runs long.
+
+**Device-verify queue (session 8):** (a) Sa'i — pick Sa'i, mark two corners, walk the wrong way →
+confirm "wrong way, turn toward…"; step off the line → "veered off the path"; return → "back on the
+path". Tune `saiReverseThreshold` / `saiOffPathFraction` if it's twitchy or too slow. (b) Reset button
+mid-ritual. (c) Du'a → tap twice to Recite, confirm it recites per circuit and a warning cuts through.
+(d) Confirm the mic still runs commands with scene Q&A off (say "how many", "guidance", "reset").
+
 ## 2026-07-05 (session 7 — F17 device-verified; shipped Sa'i mode, voice control, du'a)
 **F17 circle-guidance works on the phone.** Sourav confirmed on iPhone 16 Pro: drifting far out →
 "ease inward", walking toward the Kaaba → "ease outward". The hard/unverifiable part is real.

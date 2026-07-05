@@ -66,6 +66,11 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
     private var safaPoint: SIMD3<Float>?
     private var marwahPoint: SIMD3<Float>?
     private var lastSaiTarget: SaiTracker.End?
+    // Sa'i spoken-guidance state (mirrors the Tawaf guidance cues).
+    private var lastSaiFraction: Float?
+    private var saiProgressVel: Float = 0
+    private var lastSaiGuidanceState: TawafGuide.State?
+    private var lastSaiGuidanceCue = Date.distantPast
     private var frameCounter = 0
     private var lastObstacleSpoken = Date.distantPast
     private var lastGuidanceState: TawafGuide.State?
@@ -184,6 +189,7 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
         lastGuidanceState = nil
         guidanceState = .acquiring
         lastSaiTarget = nil
+        lastSaiFraction = nil; saiProgressVel = 0; lastSaiGuidanceState = nil
         safaPoint = nil; marwahPoint = nil
         count = 0; circuitProgress = 0
         nearestObstacle = nil
@@ -291,9 +297,18 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
             confirm(l.progressSpoken(count, tawaf: ritual == .tawaf))
         case .help:
             confirm(l.helpSpoken)
-        case .describe, .unknown:
-            Task { await describeScene() }
-            return                     // describeScene resumes the beacon itself
+        case .describe:
+            if DemoTuning.sceneAnswerEnabled {
+                Task { await describeScene() }
+                return                 // describeScene resumes the beacon itself
+            }
+            confirm(l.notNowSpoken)    // scene Q&A is off for this demo
+        case .unknown:
+            if DemoTuning.sceneAnswerEnabled {
+                Task { await describeScene() }
+                return
+            }
+            confirm(l.helpSpoken)      // not a command → remind them what they can say
         }
         resumeGuidanceIfWalking()
     }
@@ -408,6 +423,7 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
             }
             phase = .sai
             lastSaiTarget = nil
+            lastSaiFraction = nil; saiProgressVel = 0; lastSaiGuidanceState = nil
             statusLine = l.beginWalking
             speech.speak(l.beginSaiSpoken)
             if guidanceOn { guidanceAudio.start() }
@@ -417,6 +433,9 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
     private func updateSai(camPos: SIMD2<Float>, fwd: SIMD2<Float>) {
         if let completed = saiTracker.update(cameraWorldPosition: SIMD3(camPos.x, 0, camPos.y)) {
             count = completed
+            // A length just ended: the target flips, so wipe the progress trend to
+            // avoid a spurious "wrong way" at the turn.
+            lastSaiFraction = nil; saiProgressVel = 0; lastSaiGuidanceState = nil
             if saiTracker.isComplete {
                 phase = .complete
                 statusLine = l.saiComplete
@@ -430,9 +449,20 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
         }
         circuitProgress = saiTracker.fractionOfCurrent
 
-        // Linear guidance: a beacon that pans toward the endpoint they're walking to.
+        // Track progress-toward-target velocity (smoothed) so we can tell when the
+        // pilgrim is walking AWAY from the endpoint they should reach.
+        let frac = saiTracker.fractionOfCurrent
+        if let last = lastSaiFraction {
+            saiProgressVel = saiProgressVel * 0.85 + (frac - last) * 0.15
+        }
+        lastSaiFraction = frac
+
+        // Linear guidance: a beacon that pans toward the endpoint they're walking to,
+        // plus spoken corrections for the two ways a Sa'i leg goes wrong — walking
+        // the wrong way, or veering off the Safa↔Marwah line.
         if guidanceOn, let target = saiTracker.nextTarget,
-           let targetPoint = (target == .safa ? safaPoint : marwahPoint) {
+           let targetPoint = (target == .safa ? safaPoint : marwahPoint),
+           let safa = safaPoint, let marwah = marwahPoint {
             let tp = SIMD2<Float>(targetPoint.x, targetPoint.z)
             let toTarget = tp - camPos
             let len = simd_length(toTarget)
@@ -444,15 +474,63 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
                 let steerAngle = atan2(cross, dot)
                 let steer = simd_clamp(steerAngle / (.pi / 2), -1, 1)
                 let onAxis = abs(steerAngle) <= 0.26
-                let gd = TawafGuide.Guidance(state: .onPath, steer: steer, onAxis: onAxis,
+
+                // Perpendicular (lateral) distance off the Safa↔Marwah line.
+                let a = SIMD2<Float>(safa.x, safa.z)
+                let b = SIMD2<Float>(marwah.x, marwah.z)
+                let ab = b - a
+                let abLen = simd_length(ab)
+                var lateral: Float = 0
+                if abLen > 1e-4 {
+                    let abhat = ab / abLen
+                    let ap = camPos - a
+                    lateral = abs(ap.x * abhat.y - ap.y * abhat.x)   // 2-D cross magnitude
+                }
+                let offPathTol = max(DemoTuning.saiOffPathFloorM,
+                                     DemoTuning.saiOffPathFraction * abLen)
+
+                // Priority: wrong way is the most urgent, then off-path, else on-path.
+                let state: TawafGuide.State
+                if saiProgressVel < -DemoTuning.saiReverseThreshold {
+                    state = .reversing
+                } else if lateral > offPathTol {
+                    state = .driftingOut
+                } else {
+                    state = .onPath
+                }
+
+                let gd = TawafGuide.Guidance(state: state, steer: steer, onAxis: onAxis,
                                              radiusError: 0, radius: len)
                 guidanceAudio.update(gd)
-                guidanceState = .onPath
+                guidanceState = state
                 guidanceSteerLeft = steer > 0
-                // Direction is spoken by beginSaiSpoken + lengthDone (which name the
-                // next endpoint); the beacon carries the continuous steering.
+                if !speech.isListening { speakSaiGuidance(state, target: target) }
             }
             lastSaiTarget = target
+        }
+    }
+
+    /// Speak a terse Sa'i correction on state change or after a cooldown — the same
+    /// discipline as `speakGuidance` (continuous nuance lives in the beacon).
+    private func speakSaiGuidance(_ state: TawafGuide.State, target: SaiTracker.End) {
+        let now = Date()
+        let changed = state != lastSaiGuidanceState
+        let prev = lastSaiGuidanceState
+        defer { lastSaiGuidanceState = state }
+        let minGap: TimeInterval = 3
+        let due = changed || now.timeIntervalSince(lastSaiGuidanceCue) > minGap
+        switch state {
+        case .reversing where due:
+            lastSaiGuidanceCue = now
+            speech.speak(l.saiReversingSpoken(target), interrupting: false)
+        case .driftingOut where due:
+            lastSaiGuidanceCue = now
+            speech.speak(l.saiOffPathSpoken, interrupting: false)
+        case .onPath:
+            if changed, let p = prev, p == .reversing || p == .driftingOut {
+                speech.speak(l.backOnPathSpoken, interrupting: false)
+            }
+        default: break
         }
     }
 

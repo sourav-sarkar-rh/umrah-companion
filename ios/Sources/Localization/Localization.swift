@@ -82,6 +82,15 @@ struct L10n {
     var askButton: String {
         switch lang { case .en: "Ask what's around me"; case .ar: "ماذا حولي؟"; case .ur: "میرے اردگرد کیا ہے؟" }
     }
+    /// Mic button while a ritual is running: voice COMMANDS (not scene Q&A).
+    var voiceButton: String {
+        switch lang { case .en: "Voice command"; case .ar: "أمر صوتي"; case .ur: "صوتی کمانڈ" }
+    }
+    /// Compact secondary "reset" control shown any time a ritual is in progress, so
+    /// the demo can jump between features without finishing the current one.
+    var resetButton: String {
+        switch lang { case .en: "Reset"; case .ar: "إعادة"; case .ur: "ری سیٹ" }
+    }
     var listening: String {
         switch lang { case .en: "Listening…"; case .ar: "أستمع…"; case .ur: "سن رہا ہوں…" }
     }
@@ -125,14 +134,16 @@ struct L10n {
         case .ur: "آپ اب دعا کر سکتے ہیں۔"
         }
     }
-    /// Recite mode: the short, authentic phrase said facing the Black Stone at the
-    /// start of each circuit. Kept short on purpose (a long recitation must never
-    /// block a safety warning). For production, replace TTS with reciter audio.
+    /// Recite mode: the app itself recites the du'a aloud (not just "say your du'a").
+    /// We use the canonical Tawaf supplication — "Rabbana atina…" — the one most
+    /// pilgrims recite between the corners. Kept to a single ayah so it never runs
+    /// long enough to block a safety warning (a warning still interrupts it — see
+    /// the obstacle rule). For production, swap TTS for real reciter audio.
     var duaRecite: String {
         switch lang {
-        case .en: "Bismillah, Allahu Akbar."
-        case .ar: "بسم الله، الله أكبر."
-        case .ur: "بسم اللہ، اللہ اکبر۔"
+        case .en: "Bismillah, Allahu Akbar. Rabbana atina fid-dunya hasanatan, wa fil-akhirati hasanatan, wa qina 'adhaban-nar."
+        case .ar: "بسم الله، الله أكبر. ربّنا آتنا في الدنيا حسنة، وفي الآخرة حسنة، وقنا عذاب النار."
+        case .ur: "بسم اللہ، اللہ اکبر۔ ربّنا آتنا فی الدنیا حسنۃً و فی الآخرۃ حسنۃً و قنا عذاب النار۔"
         }
     }
     func duaModeName(_ mode: Int) -> String {
@@ -262,6 +273,24 @@ struct L10n {
         case .en: return "Length \(num(n)) of seven complete.\(turn)"
         case .ar: return "اكتمل الشوط \(num(n)) من سبعة.\(turn)"
         case .ur: return "\(num(n)) واں چکر مکمل ہوا، سات میں سے۔\(turn)"
+        }
+    }
+
+    // MARK: Sa'i walk-guidance (spoken corrections, mirroring Tawaf's)
+    /// Wrong way during Sa'i — walking away from the endpoint they should reach.
+    func saiReversingSpoken(_ target: SaiTracker.End) -> String {
+        switch lang {
+        case .en: return "Wrong way. Turn around and head toward \(endName(target))."
+        case .ar: return "الاتجاه خاطئ. استدر واتجه نحو \(endName(target))."
+        case .ur: return "غلط سمت۔ مڑ جائیں اور \(endName(target)) کی طرف چلیں۔"
+        }
+    }
+    /// Drifted sideways off the Safa↔Marwah line.
+    var saiOffPathSpoken: String {
+        switch lang {
+        case .en: "You've veered off the path. Come back to the line between Safa and Marwah."
+        case .ar: "لقد ابتعدت عن المسار. عد إلى الخط بين الصفا والمروة."
+        case .ur: "آپ راستے سے ہٹ گئے ہیں۔ صفا اور مروہ کے درمیان لکیر پر واپس آ جائیں۔"
         }
     }
 

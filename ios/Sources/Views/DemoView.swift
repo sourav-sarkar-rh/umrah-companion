@@ -194,11 +194,25 @@ struct DemoView: View {
                 case .marking, .markingSecond:
                     bigButton(markLabel, "scope", gold) { vm.markCenter() }
                 case .tawaf, .sai:
-                    bigButton(vm.speech.isListening ? vm.l.listening : vm.l.askButton,
+                    bigButton(vm.speech.isListening ? vm.l.listening : vm.l.voiceButton,
                               "mic.fill", .blue) { vm.startVoice() }
                 case .complete:
                     bigButton(vm.l.startAgain, "arrow.counterclockwise", gold) { vm.restart() }
                 }
+            }
+
+            // Always-available reset while a ritual is in progress, so the demo can
+            // jump between features without finishing the current one.
+            if vm.phase == .marking || vm.phase == .markingSecond
+                || vm.phase == .tawaf || vm.phase == .sai {
+                Button { vm.restart() } label: {
+                    Label(vm.l.resetButton, systemImage: "arrow.counterclockwise")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity).frame(height: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(.white)
+                .accessibilityHint(vm.l.resetButton)
             }
         }
     }

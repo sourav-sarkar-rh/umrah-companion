@@ -25,4 +25,19 @@ enum DemoTuning {
     /// ~0.4 m reads well on a table; bump up for a room-scale walk. Purely
     /// cosmetic — it does NOT affect circuit counting (that's angular).
     static let kaabaSizeM: Float = 0.4
+
+    /// Demo toggle: the open-ended "what's around me?" scene answer (the AI/cloud
+    /// reasoning path). Voice COMMANDS (tawaf, mark, reset, guide, dua…) stay live
+    /// regardless — this only gates the free-form scene description, which is the
+    /// least reliable thing to show live. Flip back to `true` to restore it.
+    static let sceneAnswerEnabled = false
+
+    /// Sa'i walk-guidance thresholds. Scale-free like the tracker: the off-path
+    /// tolerance is a fraction of the marked Safa↔Marwah distance (with a floor),
+    /// so it works at table scale or full Mas'a scale.
+    static let saiOffPathFraction: Float = 0.15
+    static let saiOffPathFloorM: Float = 0.3
+    /// Smoothed progress-toward-target velocity below this (negative) = walking the
+    /// wrong way. Progress is the 0→1 fraction toward the endpoint being walked to.
+    static let saiReverseThreshold: Float = 0.0015
 }
