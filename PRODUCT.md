@@ -33,7 +33,19 @@ Legend: ✅ done · 🟡 in progress · ⬜ todo · 🔮 later (post-demo)
   learning the orbit radius from the first steps. `GuidanceAudio` synthesises a Soundscape-style
   panned beacon + on-axis confirmation tone + a separate radial-drift earcon (no audio assets).
   Terse egocentric spoken corrections. OFF by default, toggle in the top bar, auto-pauses while the
-  mic listens. **Logic verified headlessly; beacon + AR steering are device-verify (blindfold walk).**
+  mic listens. **DEVICE-VERIFIED on iPhone 16 Pro (2026-07-05): drift-out → "ease inward", drift-in
+  toward the Kaaba → "ease outward" both fire correctly.** Beacon-tone tuning still to taste.
+- 🟡 **F19 Sa'i as a ritual mode** — Tawaf and Sa'i share one screen (a MODE switch, not a nav stack —
+  blind-hostile navigation avoided). Idle screen selects the ritual; Sa'i marks Safa + Marwah (two AR
+  pillars), wires the tested `SaiTracker`, announces each length + turn-around, ring shows lengths/7,
+  linear beacon guidance toward the endpoint. Builds green; AR walk device-verify.
+- 🟡 **F20 Voice command layer** — one entry point (mic button · double-tap anywhere · VoiceOver
+  magic-tap). `VoiceCommands` pure on-device intent matcher (fixed grammar, EN/AR/UR, 21/21 tests):
+  select tawaf/sai, mark, reset, describe, guidance, mute, du'a, count, help. Non-commands fall
+  through to the on-device scene answer. Spoken confirmations. Builds green; mic device-verify.
+- 🟡 **F21 Du'a guidance (optional)** — Off / Prompt / Recite, default OFF, top-bar button + voice.
+  Non-prescriptive; **safety always interrupts a recitation**. Short authentic phrase (reciter audio
+  to replace TTS in production). Builds green; device-verify.
 - 🟡 **F9 Live cloud path** — Anthropic key in `proxy/.env`; proxy→Claude verified live (English + Arabic). Phone→proxy leg pending F7.
 
 ### Polish (v0.1 — nicer demo)
@@ -48,7 +60,7 @@ Legend: ✅ done · 🟡 in progress · ⬜ todo · 🔮 later (post-demo)
 - ⬜ **F13 Standalone proxy** — deploy proxy to a small cloud host so the phone needs no laptop.
 
 ### Later (real product — mostly out of demo scope) 🔮
-Sa'i ritual · other disability modes · custom Mecca-landmark CV dataset · Android/ARCore ·
+Other disability modes · custom Mecca-landmark CV dataset · Android/ARCore ·
 companion matching · Nusuk/Tawakkalna/Nafath integrations · emergency signal · in-Kingdom PDPL
 hosting · sign-language video · Hajj-scale load. (See `docs/` for the full architecture.)
 

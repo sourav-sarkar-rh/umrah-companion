@@ -2,6 +2,41 @@
 
 _Update this at the end of every session. Newest at top._
 
+## 2026-07-05 (session 7 — F17 device-verified; shipped Sa'i mode, voice control, du'a)
+**F17 circle-guidance works on the phone.** Sourav confirmed on iPhone 16 Pro: drifting far out →
+"ease inward", walking toward the Kaaba → "ease outward". The hard/unverifiable part is real.
+
+**Three features added, each its own revertable commit (all build green on iPhone 17 Pro/26.5; AR +
+audio + mic are device-verify per the repo guardrail):**
+- **F19 Sa'i as a MODE** (`34f69fc`) — not a nav stack (blind-hostile). VM generalized:
+  `Ritual{tawaf,sai}`, phase machine `idle → marking[/markingSecond] → tawaf|sai → complete`, shared
+  `count`/ring. Sa'i marks Safa+Marwah (two AR pillars), wires the tested `SaiTracker`, announces
+  lengths + turn-around, linear beacon pans toward the current endpoint. Ritual chosen on the idle
+  screen (buttons now; voice too via F20).
+- **F20 Voice command layer** (`a1e0f5a`) — `Sources/Voice/VoiceCommands.swift`, a PURE Foundation
+  intent matcher (fixed grammar, keyed by lang code, EN/AR/UR) → `Tests/voice/main.swift` **21/21**.
+  One entry point `vm.startVoice()` bound to: mic button, **double-tap anywhere** (sighted), and
+  **VoiceOver two-finger magic-tap** (blind, `.accessibilityAction(.magicTap)`). Non-command
+  utterances fall through to the on-device scene answer, so open questions still work. Spoken
+  confirmations; beacon pauses for the mic, resumes after. Run:
+  `cd ios && swiftc Sources/Voice/VoiceCommands.swift Tests/voice/main.swift -o /tmp/voice && /tmp/voice`.
+- **F21 Du'a** (`3bd8229`) — Off/Prompt/Recite, **default OFF**, top-bar button + voice ("du'a").
+  Non-prescriptive wording (du'a in Tawaf is free). **Safety wins**: an obstacle warning interrupts a
+  du'a recitation in progress (`interrupting = duaMode == .recite && speech.isSpeaking`) but still
+  queues after short ritual lines. Short authentic phrase via TTS — swap for reciter audio in prod.
+
+**All four logic sims green:** tawaf, sai, guide (9/9), voice (21/21).
+
+**Device-verify queue for Sourav (one pass):** (a) Sa'i — pick Sa'i on idle, mark two table corners,
+walk back-and-forth, confirm length counting + "turn around" + linear beacon; (b) Voice — double-tap
+(and magic-tap with VoiceOver on) → say "start tawaf", "mark", "what's around me", "guidance",
+"mute", "du'a", "how many", "start again"; confirm the beacon ducks for the mic and resumes; (c) Du'a
+— cycle to Prompt/Recite, confirm per-circuit delivery and that an obstacle warning cuts through a
+recitation. Tune tone/verbosity to taste.
+
+**Next (post-demo):** fold the two session-6 research reports (iPhone-Pro roadmap across disabilities
+incl. crowd-crush/heat; blind-iOS patterns) into a `FUTURE.md`.
+
 ## 2026-07-05 (session 6 — committed the baseline; added Tawaf circle-guidance F17)
 **Git hygiene first.** Sessions 4–5 were all *uncommitted* working-tree changes. Committed the
 device-verified "everything works" state as the revert point (`d381166`), then built F17 in two
