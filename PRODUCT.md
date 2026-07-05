@@ -62,7 +62,10 @@ Legend: ✅ done · 🟡 in progress · ⬜ todo · 🔮 later (post-demo)
 ### Later (real product — mostly out of demo scope) 🔮
 Other disability modes · custom Mecca-landmark CV dataset · Android/ARCore ·
 companion matching · Nusuk/Tawakkalna/Nafath integrations · emergency signal · in-Kingdom PDPL
-hosting · sign-language video · Hajj-scale load. (See `docs/` for the full architecture.)
+hosting · sign-language video · Hajj-scale load. (See `docs/` for the full architecture, and
+**`FUTURE.md`** for the researched post-demo roadmap across disabilities — crowd-crush warning,
+heat-exertion guardian, scene narrator, deaf alerts, cognitive one-step mode — plus the blind-iOS
+design reference behind F17/F20.)
 
 ## Non-goals for the demo
 Accounts/login, backend persistence, multi-user, app-store distribution, real Mecca data.
