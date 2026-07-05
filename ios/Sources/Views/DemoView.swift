@@ -31,6 +31,10 @@ struct DemoView: View {
             }
             .padding()
         }
+        // Voice-anywhere: double-tap (sighted) + VoiceOver two-finger magic-tap (blind).
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) { vm.startVoice() }
+        .accessibilityAction(.magicTap) { vm.startVoice() }
         .environment(\.layoutDirection, vm.lang.layoutDirection)   // RTL for Arabic/Urdu
         .overlay { if showLaunch { LaunchView(l: vm.l).transition(.opacity) } }
         .onAppear {
@@ -182,7 +186,7 @@ struct DemoView: View {
                     bigButton(markLabel, "scope", gold) { vm.markCenter() }
                 case .tawaf, .sai:
                     bigButton(vm.speech.isListening ? vm.l.listening : vm.l.askButton,
-                              "mic.fill", .blue) { vm.askAboutScene() }
+                              "mic.fill", .blue) { vm.startVoice() }
                 case .complete:
                     bigButton(vm.l.startAgain, "arrow.counterclockwise", gold) { vm.restart() }
                 }

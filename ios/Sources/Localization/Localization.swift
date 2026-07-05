@@ -20,6 +20,8 @@ enum Lang: String, CaseIterable, Identifiable {
     var bcp47: String {
         switch self { case .en: "en-US"; case .ar: "ar-SA"; case .ur: "ur-PK" }
     }
+    /// 2-letter code for the voice-command matcher.
+    var code: String { String(bcp47.prefix(2)) }
     var isRTL: Bool { self == .ar || self == .ur }
     var layoutDirection: LayoutDirection { isRTL ? .rightToLeft : .leftToRight }
 }
@@ -110,6 +112,45 @@ struct L10n {
         case .en: "I cannot reach the network right now. The path ahead looks clear."
         case .ar: "لا يمكنني الاتصال بالشبكة الآن. يبدو الطريق أمامك خاليًا."
         case .ur: "ابھی نیٹ ورک دستیاب نہیں۔ آگے کا راستہ صاف لگتا ہے۔"
+        }
+    }
+
+    // MARK: Voice commands (spoken confirmations + help)
+    var guidanceOnConfirm: String {
+        switch lang { case .en: "Walk guidance on."; case .ar: "تم تشغيل إرشاد المشي."; case .ur: "چلنے کی رہنمائی آن۔" }
+    }
+    var guidanceOffConfirm: String {
+        switch lang { case .en: "Walk guidance off."; case .ar: "تم إيقاف إرشاد المشي."; case .ur: "چلنے کی رہنمائی بند۔" }
+    }
+    var muteConfirm: String {
+        switch lang { case .en: "Warnings muted."; case .ar: "تم كتم التحذيرات."; case .ur: "انتباہات خاموش۔" }
+    }
+    var unmuteConfirm: String {
+        switch lang { case .en: "Warnings on."; case .ar: "تم تشغيل التحذيرات."; case .ur: "انتباہات آن۔" }
+    }
+    var notNowSpoken: String {
+        switch lang { case .en: "Not available right now."; case .ar: "غير متاح الآن."; case .ur: "ابھی دستیاب نہیں۔" }
+    }
+    var helpSpoken: String {
+        switch lang {
+        case .en: "You can say: Tawaf, Sa'i, mark, start again, what's around me, walk guidance, or mute."
+        case .ar: "يمكنك أن تقول: طواف، سعي، حدد، من جديد، ماذا حولي، إرشاد المشي، أو اكتم."
+        case .ur: "آپ کہہ سکتے ہیں: طواف، سعی، متعین، دوبارہ، میرے اردگرد کیا ہے، رہنمائی، یا خاموش۔"
+        }
+    }
+    /// Spoken "where am I" for the count command; `n == 0` before any unit completes.
+    func progressSpoken(_ n: Int, tawaf: Bool) -> String {
+        let unit: String
+        switch (lang, tawaf) {
+        case (.en, true): unit = "circuit";  case (.en, false): unit = "length"
+        case (.ar, true): unit = "شوط";      case (.ar, false): unit = "شوط"
+        case (.ur, true): unit = "چکر";      case (.ur, false): unit = "چکر"
+        }
+        let done = min(n, 7)
+        switch lang {
+        case .en: return done == 0 ? "You haven't started counting yet." : "You are on \(unit) \(num(done + (done < 7 ? 1 : 0))) of seven."
+        case .ar: return done == 0 ? "لم يبدأ العد بعد." : "أنت في ال\(unit) \(num(done + (done < 7 ? 1 : 0))) من سبعة."
+        case .ur: return done == 0 ? "ابھی گنتی شروع نہیں ہوئی۔" : "آپ ساتویں میں سے \(num(done + (done < 7 ? 1 : 0)))واں \(unit) کر رہے ہیں۔"
         }
     }
 

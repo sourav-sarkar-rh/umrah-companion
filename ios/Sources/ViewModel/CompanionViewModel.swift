@@ -228,15 +228,51 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
         }
     }
 
-    func askAboutScene() {
-        // Tap while already listening = stop and send what was heard.
+    /// The single voice entry point — bound to the mic button, a double-tap
+    /// anywhere (sighted), and the VoiceOver magic-tap (blind). Listens, then routes
+    /// what was heard through the command matcher; anything that isn't a command is
+    /// treated as a "what's around me?" scene question.
+    func startVoice() {
         if speech.isListening { speech.finishListening(); return }
         guidanceAudio.stop()          // free the audio session for the mic
         speech.startListening { [weak self] heard in
             guard let self else { return }
-            Task { await self.answer(question: heard) }
+            Task { @MainActor in self.handleVoiceCommand(heard) }
         }
     }
+
+    /// Kept for older call sites — the voice entry point.
+    func askAboutScene() { startVoice() }
+
+    func handleVoiceCommand(_ text: String) {
+        switch VoiceCommands.matchIntent(text, langCode: lang.code) {
+        case .selectTawaf:
+            if phase == .idle { selectRitual(.tawaf) } else { confirm(l.notNowSpoken) }
+        case .selectSai:
+            if phase == .idle { selectRitual(.sai) } else { confirm(l.notNowSpoken) }
+        case .mark:
+            if phase == .marking || phase == .markingSecond { markCenter() } else { confirm(l.notNowSpoken) }
+        case .reset:
+            restart()
+        case .toggleGuidance:
+            toggleGuidance()
+            confirm(guidanceOn ? l.guidanceOnConfirm : l.guidanceOffConfirm)
+        case .toggleMute:
+            warningsMuted.toggle()
+            confirm(warningsMuted ? l.muteConfirm : l.unmuteConfirm)
+        case .count:
+            confirm(l.progressSpoken(count, tawaf: ritual == .tawaf))
+        case .help:
+            confirm(l.helpSpoken)
+        case .describe, .unknown:
+            Task { await describeScene() }
+            return                     // describeScene resumes the beacon itself
+        }
+        resumeGuidanceIfWalking()
+    }
+
+    private func confirm(_ text: String) { speech.speak(text) }
+    private func resumeGuidanceIfWalking() { if guidanceOn, isWalking { guidanceAudio.start() } }
 
     // MARK: ARSessionDelegate
     nonisolated func session(_ session: ARSession, didUpdate frame: ARFrame) {
@@ -393,14 +429,14 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
     /// from `SceneVision`, so we synthesize the spoken description locally.
     /// (The cloud proxy path still exists in `ProxyClient` for richer open-ended
     /// answers if we ever want to run it, but it's no longer required.)
-    private func answer(question: String) async {
-        guard let frame = arView?.session.currentFrame else { return }
+    private func describeScene() async {
+        guard let frame = arView?.session.currentFrame else { resumeGuidanceIfWalking(); return }
         let obs = vision.observations(from: frame)
             .sorted { ($0.distanceM ?? 99) < ($1.distanceM ?? 99) }
         let text = l.sceneDescription(Array(obs.prefix(4)))
         lastAssistantText = text
         speech.speak(text)
-        if guidanceOn, isWalking { guidanceAudio.start() }   // resume the beacon
+        resumeGuidanceIfWalking()   // resume the beacon
     }
 
     private func refreshStatus() {
