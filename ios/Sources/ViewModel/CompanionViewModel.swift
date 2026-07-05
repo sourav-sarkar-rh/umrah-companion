@@ -16,6 +16,9 @@ import UIKit
 final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
 
     enum Ritual { case tawaf, sai }
+    /// Optional du'a guidance during Tawaf. Default .off. rawValue drives the UI icon
+    /// and the localized name; never prescriptive — safety warnings always win.
+    enum DuaMode: Int { case off, prompt, recite }
     /// idle → (Tawaf) marking → tawaf → complete
     /// idle → (Sa'i) marking[Safa] → markingSecond[Marwah] → sai → complete
     enum Phase { case idle, marking, markingSecond, tawaf, sai, complete }
@@ -45,6 +48,9 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
     @Published var guidanceOn = false
     @Published var guidanceState: TawafGuide.State = .acquiring
     @Published var guidanceSteerLeft = true
+
+    /// Optional du'a guidance during Tawaf (off by default).
+    @Published var duaMode: DuaMode = .off
 
     let speech = SpeechService()
     private let tracker = TawafTracker()
@@ -200,6 +206,25 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
 
     private var isWalking: Bool { phase == .tawaf || phase == .sai }
 
+    /// Cycle du'a guidance Off → Prompt → Recite and speak the new state.
+    func cycleDua() {
+        duaMode = DuaMode(rawValue: (duaMode.rawValue + 1) % 3) ?? .off
+        confirm(l.duaModeName(duaMode.rawValue))
+    }
+
+    /// Speak the du'a for a newly-begun Tawaf circuit, if enabled. Uses
+    /// interrupting:false so it never cuts an in-flight safety warning; conversely
+    /// a warning that fires mid-recitation interrupts the du'a (see the obstacle
+    /// rule below) — safety always wins.
+    private func deliverDua() {
+        guard phase == .tawaf, !speech.isListening else { return }
+        switch duaMode {
+        case .off: break
+        case .prompt: speech.speak(l.duaPrompt, interrupting: false)
+        case .recite: speech.speak(l.duaRecite, interrupting: false)
+        }
+    }
+
     /// Speak a terse, egocentric correction on state change or after a cooldown.
     /// Continuous nuance lives in the beacon; speech is for discrete events only.
     private func speakGuidance(_ g: TawafGuide.Guidance) {
@@ -260,6 +285,8 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
         case .toggleMute:
             warningsMuted.toggle()
             confirm(warningsMuted ? l.muteConfirm : l.unmuteConfirm)
+        case .dua:
+            cycleDua()
         case .count:
             confirm(l.progressSpoken(count, tawaf: ritual == .tawaf))
         case .help:
@@ -318,7 +345,10 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
                Date().timeIntervalSince(lastObstacleSpoken) > DemoTuning.obstacleWarnCooldown,
                !speech.isListening, !warningsMuted {
                 lastObstacleSpoken = Date()
-                speech.speak(l.obstacleNear(c.label, c.direction, d), interrupting: false)
+                // Safety wins: a warning interrupts a du'a recitation in progress,
+                // but still politely queues after short ritual announcements.
+                let cutForSafety = duaMode == .recite && speech.isSpeaking
+                speech.speak(l.obstacleNear(c.label, c.direction, d), interrupting: cutForSafety)
             }
         }
     }
@@ -333,6 +363,7 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
         statusLine = l.beginWalking
         speech.speak(l.beginTawafSpoken)
         if guidanceOn { guidanceAudio.start() }
+        deliverDua()   // du'a for the first circuit, if enabled
     }
 
     private func updateTawaf(cam: SIMD4<Float>, camPos: SIMD2<Float>, fwd: SIMD2<Float>) {
@@ -345,6 +376,7 @@ final class CompanionViewModel: NSObject, ObservableObject, ARSessionDelegate {
                 guidanceAudio.stop()
             } else {
                 speech.speak(l.circuitDone(completed))
+                deliverDua()   // du'a for the circuit just begun, if enabled
             }
         }
         circuitProgress = tracker.fractionOfCurrent

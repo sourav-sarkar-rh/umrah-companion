@@ -85,6 +85,15 @@ struct DemoView: View {
             }
             .accessibilityLabel(vm.guidanceOn ? vm.l.guideOffLabel : vm.l.guideOnLabel)
 
+            Button { vm.cycleDua() } label: {
+                Image(systemName: vm.duaMode == .recite ? "hands.sparkles.fill" : "hands.sparkles")
+                    .font(.title3)
+                    .foregroundStyle(vm.duaMode == .off ? .white.opacity(0.7) : gold)
+                    .padding(8)
+                    .background(ink, in: Circle())
+            }
+            .accessibilityLabel(vm.l.duaModeName(vm.duaMode.rawValue))
+
             Button { vm.toggleDebug() } label: {
                 Image(systemName: vm.debugMesh ? "cube.transparent.fill" : "cube.transparent")
                     .font(.title3)

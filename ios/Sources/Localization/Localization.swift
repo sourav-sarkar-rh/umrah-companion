@@ -115,6 +115,34 @@ struct L10n {
         }
     }
 
+    // MARK: Du'a (optional — never prescriptive; safety always interrupts it)
+    /// Prompt mode: a gentle, non-prescriptive cue. Du'a during Tawaf is free/
+    /// personal — we invite, we don't dictate.
+    var duaPrompt: String {
+        switch lang {
+        case .en: "You may make your du'a now."
+        case .ar: "يمكنك الدعاء الآن."
+        case .ur: "آپ اب دعا کر سکتے ہیں۔"
+        }
+    }
+    /// Recite mode: the short, authentic phrase said facing the Black Stone at the
+    /// start of each circuit. Kept short on purpose (a long recitation must never
+    /// block a safety warning). For production, replace TTS with reciter audio.
+    var duaRecite: String {
+        switch lang {
+        case .en: "Bismillah, Allahu Akbar."
+        case .ar: "بسم الله، الله أكبر."
+        case .ur: "بسم اللہ، اللہ اکبر۔"
+        }
+    }
+    func duaModeName(_ mode: Int) -> String {
+        switch (lang, mode) {
+        case (.en, 0): "Du'a off";    case (.en, 1): "Du'a: prompt";  case (.en, _): "Du'a: recite"
+        case (.ar, 0): "الدعاء متوقف"; case (.ar, 1): "الدعاء: تذكير"; case (.ar, _): "الدعاء: تلاوة"
+        case (.ur, 0): "دعا بند";     case (.ur, 1): "دعا: یاد دہانی"; case (.ur, _): "دعا: تلاوت"
+        }
+    }
+
     // MARK: Voice commands (spoken confirmations + help)
     var guidanceOnConfirm: String {
         switch lang { case .en: "Walk guidance on."; case .ar: "تم تشغيل إرشاد المشي."; case .ur: "چلنے کی رہنمائی آن۔" }

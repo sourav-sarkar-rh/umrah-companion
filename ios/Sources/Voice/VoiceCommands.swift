@@ -9,7 +9,7 @@ import Foundation
 /// so it runs under the headless sim:
 ///   cd ios && swiftc Sources/Voice/VoiceCommands.swift Tests/voice/main.swift -o /tmp/voicesim && /tmp/voicesim
 enum VoiceIntent: String, Equatable {
-    case selectTawaf, selectSai, mark, reset, describe, toggleGuidance, toggleMute, count, help, unknown
+    case selectTawaf, selectSai, mark, reset, describe, toggleGuidance, toggleMute, dua, count, help, unknown
 }
 
 enum VoiceCommands {
@@ -22,6 +22,7 @@ enum VoiceCommands {
         (.selectTawaf,    ["tawaf", "tawaaf", "circle the kaaba", "start the circle"]),
         (.toggleGuidance, ["walk guidance", "guide me", "guidance", "help me walk", "turn on guide", "turn off guide"]),
         (.toggleMute,     ["unmute", "mute", "be quiet", "silence", "stop warnings", "quiet"]),
+        (.dua,            ["dua", "du'a", "supplication", "recite", "prayer words"]),
         (.count,          ["how many", "which circuit", "which lap", "how far", "laps left", "circuits left", "where am i in", "count"]),
         (.describe,       ["around me", "what's around", "what is around", "describe", "in front of me", "what do you see", "what is in front", "surroundings", "the scene"]),
         (.mark,           ["mark", "over here", "this spot", "set the center", "set center", "place it", "this place"]),
@@ -33,6 +34,7 @@ enum VoiceCommands {
         (.selectTawaf,    ["طواف", "الطواف"]),
         (.toggleGuidance, ["إرشاد", "دلني", "أرشدني", "رشدني"]),
         (.toggleMute,     ["اكتم", "صمت", "أوقف التحذير", "اسكت"]),
+        (.dua,            ["دعاء", "الدعاء", "ذكر"]),
         (.count,          ["كم شوط", "كم بقي", "أي شوط", "أين أنا"]),
         (.describe,       ["ماذا حولي", "حولي", "صف", "أمامي", "ماذا ترى"]),
         (.mark,           ["حدد", "هنا", "علّم", "هذا الموضع"]),
@@ -44,6 +46,7 @@ enum VoiceCommands {
         (.selectTawaf,    ["طواف"]),
         (.toggleGuidance, ["رہنمائی", "میری رہنمائی", "چلنے میں مدد"]),
         (.toggleMute,     ["خاموش", "بند کرو", "انتباہ بند"]),
+        (.dua,            ["دعا", "دعائیں", "ذکر"]),
         (.count,          ["کتنے", "کونسا چکر", "کہاں ہوں", "کتنا باقی"]),
         (.describe,       ["اردگرد", "میرے اردگرد", "بیان", "سامنے", "کیا دیکھتے"]),
         (.mark,           ["متعین", "یہاں", "نشان", "یہ جگہ"]),
