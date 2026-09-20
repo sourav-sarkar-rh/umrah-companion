@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "xcodebuild": {
+      "command": "/opt/homebrew/bin/xcodebuildmcp",
+      "args": ["mcp"],
+      "env": {}
+    }
+  }
+}

@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Umrah Companion — UX walkthrough &amp; audio redesign</title>
+<style>
+:root{
+  --gold:#D4AD54; --teal:#0F5451; --deep:#082B29; --ink:#0a0f0f;
+  --panel:rgba(255,255,255,.055); --line:rgba(255,255,255,.13);
+  --txt:#EDF2F1; --dim:#93A5A3; --grn:#4CB963; --red:#E5484D; --blu:#3B82F6; --org:#E8912D;
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:radial-gradient(1200px 800px at 78% -10%,#123f3d 0%,var(--deep) 55%,#050e0d 100%);
+  color:var(--txt); font-family:var(--sans); -webkit-font-smoothing:antialiased;
+}
+/* ---------- deck chrome ---------- */
+#deck{height:100vh;overflow:hidden;position:relative}
+.slide{
+  position:absolute;inset:0;padding:44px 56px 76px;overflow-y:auto;
+  opacity:0;pointer-events:none;transform:translateY(14px);
+  transition:opacity .34s ease,transform .34s ease;
+}
+.slide.on{opacity:1;pointer-events:auto;transform:none}
+h1{font-size:44px;line-height:1.08;margin:0 0 14px;letter-spacing:-.02em;font-weight:800}
+h2{font-size:30px;line-height:1.14;margin:0 0 6px;letter-spacing:-.015em;font-weight:750}
+h3{font-size:15px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.11em;color:var(--gold);font-weight:700}
+p{line-height:1.62;margin:0 0 12px;max-width:74ch;color:#DCE6E4}
+.lede{font-size:19px;color:#C6D4D2;max-width:80ch}
+.dim{color:var(--dim)}
+small{color:var(--dim);font-size:13px;line-height:1.55}
+code{font-family:var(--mono);font-size:.88em;background:rgba(255,255,255,.08);
+  padding:2px 6px;border-radius:5px;color:#F0D9A6;white-space:nowrap}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:16px}
+.rule{height:1px;background:var(--line);margin:22px 0}
+/* nav */
+#bar{position:fixed;left:0;right:0;bottom:0;height:56px;display:flex;align-items:center;
+  gap:14px;padding:0 22px;background:rgba(4,12,11,.82);backdrop-filter:blur(14px);
+  border-top:1px solid var(--line);z-index:60}
+#bar button{background:var(--panel);color:var(--txt);border:1px solid var(--line);
+  border-radius:9px;padding:7px 13px;font:inherit;font-size:13px;cursor:pointer}
+#bar button:hover{background:rgba(255,255,255,.11);border-color:rgba(212,173,84,.5)}
+#dots{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;max-width:52%;justify-content:flex-end}
+.dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.2);cursor:pointer;flex:none}
+.dot.on{background:var(--gold);transform:scale(1.35)}
+#pos{font-family:var(--mono);font-size:12px;color:var(--dim);min-width:56px}
+/* layout */
+.grid{display:grid;gap:26px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:repeat(3,1fr)}
+.split{display:grid;grid-template-columns:minmax(288px,306px) 1fr;gap:38px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+.card h4{margin:0 0 8px;font-size:16px;color:var(--gold)}
+.card p{font-size:14.5px;margin:0;color:#CFDBD9}
+.tag{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.06em;
+  padding:3px 8px;border-radius:20px;border:1px solid;margin:0 5px 5px 0;white-space:nowrap}
+.t-done{color:var(--grn);border-color:rgba(76,185,99,.45);background:rgba(76,185,99,.1)}
+.t-gap{color:var(--red);border-color:rgba(229,72,77,.45);background:rgba(229,72,77,.1)}
+.t-new{color:var(--gold);border-color:rgba(212,173,84,.45);background:rgba(212,173,84,.1)}
+.t-neu{color:var(--dim);border-color:var(--line)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--gold);font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;font-weight:700}
+td.ic{width:44px}
+tr:hover td{background:rgba(255,255,255,.028)}
+ul{margin:0 0 12px;padding-left:20px;line-height:1.66;color:#DCE6E4}
+li{margin-bottom:7px}
+li::marker{color:var(--gold)}
+.note{border-left:3px solid var(--gold);padding:10px 0 10px 16px;margin:16px 0;
+  background:linear-gradient(90deg,rgba(212,173,84,.09),transparent 70%);border-radius:0 8px 8px 0}
+.note p{margin:0;font-size:14.5px}
+.warn{border-left-color:var(--red);background:linear-gradient(90deg,rgba(229,72,77,.1),transparent 70%)}
+/* ---------- phone ---------- */
+.phone{width:288px;height:600px;border-radius:40px;padding:9px;flex:none;
+  background:linear-gradient(160deg,#3a3f3e,#141918 60%);
+  box-shadow:0 34px 80px rgba(0,0,0,.62),0 0 0 1px rgba(255,255,255,.09);position:relative}
+.screen{position:relative;width:100%;height:100%;border-radius:32px;overflow:hidden;
+  background:#0c1413;display:flex;flex-direction:column;isolation:isolate}
+.cam{position:absolute;inset:0;
+  background:
+    radial-gradient(60% 42% at 50% 74%,rgba(150,120,70,.36),transparent 70%),
+    linear-gradient(#1d2725 0%,#141d1c 42%,#28221a 42.5%,#3a2f22 100%);}
+.cam.mesh{background:
+    repeating-linear-gradient(58deg,rgba(90,255,220,.30) 0 1px,transparent 1px 17px),
+    repeating-linear-gradient(-58deg,rgba(90,255,220,.30) 0 1px,transparent 1px 17px),
+    linear-gradient(#111a19,#221d16);}
+.notch{position:absolute;top:8px;left:50%;transform:translateX(-50%);width:84px;height:20px;
+  background:#000;border-radius:14px;z-index:9}
+.ui{position:relative;z-index:5;display:flex;flex-direction:column;height:100%;padding:11px;gap:7px}
+.ui.rtl{direction:rtl}
+.ink{background:rgba(0,0,0,.55);border-radius:15px}
+.topbar{display:flex;align-items:center;gap:5px;margin-top:20px}
+.langpill{display:flex;align-items:center;gap:4px;background:rgba(0,0,0,.55);
+  border-radius:99px;padding:5px 9px;font-size:10.8px;font-weight:650;color:#fff;cursor:pointer}
+.tb{width:29px;height:29px;border-radius:50%;background:rgba(0,0,0,.55);display:grid;
+  place-items:center;cursor:pointer;flex:none;transition:transform .12s}
+.tb:hover{transform:scale(1.09)}
+.tb svg{width:17px;height:17px}
+.tb.off svg{fill:rgba(255,255,255,.7);stroke:rgba(255,255,255,.7)}
+.tb.on svg{fill:var(--gold);stroke:var(--gold)}
+.tb.red svg{fill:var(--red);stroke:var(--red)}
+.banner{display:flex;align-items:center;gap:8px;padding:10px;font-size:12px;font-weight:650;line-height:1.32}
+.led{width:9px;height:9px;border-radius:50%;flex:none}
+.gbanner{display:flex;align-items:center;gap:7px;padding:8px 10px;font-size:11.5px;font-weight:700}
+.det{padding:7px 9px;display:flex;flex-direction:column;gap:4px;font-size:10.8px}
+.detrow{display:flex;align-items:center;gap:7px}
+.detrow .d{margin-left:auto;color:var(--gold);font-family:var(--mono)}
+.ui.rtl .detrow .d{margin-left:0;margin-right:auto}
+.ring{width:146px;height:146px;margin:2px auto;position:relative;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ringtxt{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.ringtxt b{display:block;font-size:44px;font-weight:800;line-height:1;
+  font-family:ui-rounded,var(--sans)}
+.ringtxt span{font-size:11.5px;color:rgba(255,255,255,.85)}
+.spacer{flex:1}
+.chip{display:flex;align-items:center;gap:6px;background:rgba(229,72,77,.85);
+  border-radius:99px;padding:7px 11px;font-size:10.8px;font-weight:700;justify-content:center}
+.btnrow{display:flex;gap:9px}
+.big{flex:1;height:46px;border-radius:11px;border:none;font:inherit;font-size:13px;
+  font-weight:800;display:flex;align-items:center;justify-content:center;gap:7px;
+  cursor:pointer;color:#0d0d0d}
+.big.gold{background:var(--gold)}
+.big.green{background:var(--grn)}
+.big.blue{background:var(--blu);color:#fff}
+.big svg{width:16px;height:16px}
+.reset{height:34px;border-radius:9px;background:transparent;border:1px solid rgba(255,255,255,.55);
+  color:#fff;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;gap:6px}
+.launch{position:absolute;inset:0;z-index:20;display:grid;place-content:center;text-align:center;
+  background:linear-gradient(160deg,var(--teal),var(--deep));gap:10px}
+/* callouts */
+.callout{display:flex;gap:11px;align-items:flex-start;font-size:13.5px;line-height:1.5;
+  padding:9px 0;border-bottom:1px dashed var(--line)}
+.callout b{color:var(--gold);font-family:var(--mono);font-size:11px;letter-spacing:.05em;
+  border:1px solid rgba(212,173,84,.4);border-radius:4px;padding:2px 6px;flex:none;margin-top:1px}
+/* state chips row */
+.states{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 0}
+.sbtn{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:8px;
+  padding:6px 11px;font:inherit;font-size:12.5px;cursor:pointer}
+.sbtn.on{border-color:var(--gold);background:rgba(212,173,84,.16);color:var(--gold)}
+/* audio timeline */
+.tl{position:relative;height:74px;border:1px solid var(--line);border-radius:10px;
+  background:rgba(0,0,0,.28);margin:10px 0 4px;overflow:hidden}
+.tl .lab{position:absolute;left:9px;top:7px;font-family:var(--mono);font-size:10.5px;
+  color:var(--dim);letter-spacing:.05em;z-index:3}
+.ev{position:absolute;bottom:8px;border-radius:3px;height:26px}
+.ev.sp{background:rgba(229,72,77,.85)}
+.ev.ec{background:rgba(212,173,84,.9);height:13px}
+.ev.hp{background:rgba(59,130,246,.9);height:9px}
+.tone{position:absolute;left:0;right:0;bottom:38px;height:12px;
+  background:repeating-linear-gradient(90deg,rgba(212,173,84,.75) 0 3px,transparent 3px 12px)}
+.tl small{position:absolute;right:9px;top:7px}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--dim);margin-top:6px;flex-wrap:wrap}
+.sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+/* audio demo */
+.audiobox{border:1px solid rgba(212,173,84,.35);border-radius:14px;padding:16px 18px;
+  background:linear-gradient(160deg,rgba(212,173,84,.09),transparent)}
+.playrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.play{background:var(--gold);color:#111;border:none;border-radius:10px;padding:10px 16px;
+  font:inherit;font-weight:750;font-size:13.5px;cursor:pointer}
+.play.ghost{background:transparent;color:var(--gold);border:1px solid rgba(212,173,84,.55)}
+.play:disabled{opacity:.45;cursor:default}
+#lognow{font-family:var(--mono);font-size:12px;color:var(--gold);min-height:18px;margin-top:9px}
+.big-num{font-size:52px;font-weight:800;color:var(--gold);line-height:1;letter-spacing:-.03em}
+.metric{text-align:center;padding:16px 10px}
+.metric small{display:block;margin-top:7px;font-size:12.5px}
+.arrow{display:grid;place-content:center;font-size:26px;color:var(--gold)}
+@media (max-width:1080px){
+  .split{grid-template-columns:1fr;gap:26px}.g2,.g3{grid-template-columns:1fr}
+  h1{font-size:33px}h2{font-size:24px}.slide{padding:28px 22px 74px}
+}
+</style>
+</head>
+<body>
+<div id="deck"></div>
+<div id="bar">
+  <button onclick="go(-1)">← Prev</button>
+  <button onclick="go(1)">Next →</button>
+  <span id="pos"></span>
+  <span class="dim" style="font-size:12px">← → arrows · click a dot</span>
+  <div id="dots"></div>
+</div>
+<script>
+/* ============================================================
+   SF Symbol approximations. Names match the Swift source so the
+   deck and DemoView.swift can be diffed by eye.
+   ============================================================ */
+const I = {
+ globe:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18"/></svg>`,
+ waveform:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3 12h2M7 7v10M11 4v16M15 8v8M19 11h2"/></svg>`,
+ "speaker.wave.2.fill":`<svg viewBox="0 0 24 24"><path d="M3 9h3l4-3.5v13L6 15H3z" fill="currentColor"/><path d="M14 8.5a4.5 4.5 0 010 7M17 6a8 8 0 010 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+ "speaker.slash.fill":`<svg viewBox="0 0 24 24"><path d="M3 9h3l4-3.5v13L6 15H3z" fill="currentColor"/><path d="M14 9l6 6M20 9l-6 6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>`,
+ "figure.walk.circle":`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12.5" cy="6.6" r="1.3" fill="currentColor" stroke="none"/><path d="M12.4 9l-1.6 3.4 1.1 1.2.6 3.6M10.8 12.4L8.6 14M13.5 13.6l2 1.3" stroke-linecap="round"/></svg>`,
+ "figure.walk.circle.fill":`<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.4" fill="currentColor"/><g stroke="#0c1413" stroke-width="1.7" fill="none" stroke-linecap="round"><circle cx="12.5" cy="6.6" r="1.2" fill="#0c1413" stroke="none"/><path d="M12.4 9.2l-1.6 3.3 1.1 1.2.6 3.5M10.8 12.4L8.7 14M13.5 13.6l1.9 1.3"/></g></svg>`,
+ "hands.sparkles":`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7 21v-5.5c0-1 .5-1.8 1.3-2.3M17 21v-5.5c0-1-.5-1.8-1.3-2.3M9 13V8.5a1.2 1.2 0 012.4 0V13M12.6 13V8.5a1.2 1.2 0 012.4 0V13"/><path d="M12 2.4l.7 1.7 1.7.7-1.7.7-.7 1.7-.7-1.7L9.6 4.8l1.7-.7z" fill="currentColor" stroke="none"/></svg>`,
+ "hands.sparkles.fill":`<svg viewBox="0 0 24 24"><g fill="currentColor"><path d="M6.2 21v-5.6c0-1.3.7-2.3 1.8-2.9V8.4a1.4 1.4 0 012.8 0V12h.6V8.4a1.4 1.4 0 012.8 0V12h.6c1.1.6 1.8 1.6 1.8 2.9V21z"/><path d="M12 2l.85 2.05L14.9 5l-2.05.85L12 7.9l-.85-2.05L9.1 5l2.05-.85z"/></g></svg>`,
+ "cube.transparent":`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2.2"><path d="M12 2.7l8 4.6v9.4l-8 4.6-8-4.6V7.3z"/><path d="M4 7.3l8 4.6 8-4.6M12 11.9v9.4" stroke-dasharray="0"/></svg>`,
+ "cube.transparent.fill":`<svg viewBox="0 0 24 24"><path d="M12 2.7l8 4.6v9.4l-8 4.6-8-4.6V7.3z" fill="currentColor" opacity=".92"/><path d="M4 7.3l8 4.6 8-4.6M12 11.9v9.4" fill="none" stroke="#0c1413" stroke-width="1.4"/></svg>`,
+ "checkmark.circle.fill":`<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.4" fill="currentColor"/><path d="M7.8 12.3l2.7 2.7 5.5-5.6" fill="none" stroke="#0c1413" stroke-width="2.1" stroke-linecap="round"/></svg>`,
+ "arrow.triangle.turn.up.right.circle.fill":`<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.4" fill="currentColor"/><path d="M7.6 16.4v-2.6a3.2 3.2 0 013.2-3.2h4" fill="none" stroke="#0c1413" stroke-width="2" stroke-linecap="round"/><path d="M13.6 7.9l3 2.7-3 2.7z" fill="#0c1413"/></svg>`,
+ viewfinder:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 8.5V5.6A1.6 1.6 0 015.6 4H8.5M15.5 4h2.9A1.6 1.6 0 0120 5.6V8.5M20 15.5v2.9a1.6 1.6 0 01-1.6 1.6h-2.9M8.5 20H5.6A1.6 1.6 0 014 18.4v-2.9"/></svg>`,
+ "figure.walk.motion":`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="14" cy="4.6" r="1.5" fill="currentColor" stroke="none"/><path d="M13.8 7.4l-1.7 3.8 1.3 1.4.7 4M12 11.2l-2.6 1.8M15.2 12.6l2.2 1.5M2.5 8h4M2.5 12h3M2.5 16h4"/></svg>`,
+ "circle.circle":`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.4"/></svg>`,
+ "arrow.left.arrow.right":`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6L4 10l4 4M4 10h13M16 12l4 4-4 4M20 16H7"/></svg>`,
+ scope:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="2.2"/><path d="M12 1.6v4.2M12 18.2v4.2M1.6 12h4.2M18.2 12h4.2" stroke-linecap="round"/></svg>`,
+ "mic.fill":`<svg viewBox="0 0 24 24"><rect x="9.2" y="2.4" width="5.6" height="11" rx="2.8" fill="currentColor"/><path d="M6 11.4a6 6 0 0012 0M12 17.4V21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>`,
+ "arrow.counterclockwise":`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M3.6 6.4v5h5"/><path d="M4.6 11.2A8 8 0 1112 20"/></svg>`,
+};
+const ic = (n,cls='') => `<span class="${cls}" style="display:inline-flex">${I[n]||''}</span>`;
+
+/* ============================================================
+   Live app state. Mirrors CompanionViewModel's @Published vars.
+   ============================================================ */
+const L = {
+  en:{name:"English",rtl:false,choose:"Choose your ritual: Tawaf or Sa'i.",
+      markPrompt:"Point at the table, then tap to mark the Kaaba.",
+      markSafa:"Point at the start, Safa, then tap to mark it.",
+      markMarwah:"Now point at the far end, Marwah, and tap.",
+      begin:"Kaaba marked. Begin walking your circuits.",
+      tawafDone:"Tawaf complete.",saiDone:"Sa'i complete.",
+      tawaf:"Tawaf",sai:"Sa'i",mark:"Mark the Kaaba",markHere:"Mark this spot",
+      voice:"Voice command",listening:"Listening…",reset:"Reset",again:"Start again",
+      of7c:"of 7 circuits",of7l:"of 7 lengths",
+      g:{onPath:"On the path",acquiring:"Finding your orbit…",driftingIn:"Too close — ease out",
+         driftingOut:"Too far — ease in",reversing:"Wrong way"},
+      dua:["Du'a off","Du'a: prompt","Du'a: recite"],
+      det:[["Chair","1.2"],["Person","2.0"],["Table","2.4"]],
+      chip:(d)=>`Careful, chair, ${d} m on your left`},
+  ar:{name:"العربية",rtl:true,choose:"اختر شعيرتك: الطواف أو السعي.",
+      markPrompt:"وجّه الكاميرا إلى الطاولة، ثم انقر لتحديد الكعبة.",
+      markSafa:"وجّه إلى البداية، الصفا، ثم انقر لتحديدها.",
+      markMarwah:"الآن وجّه إلى الطرف الآخر، المروة، وانقر.",
+      begin:"تم تحديد الكعبة. ابدأ المشي.",
+      tawafDone:"اكتمل الطواف.",saiDone:"اكتمل السعي.",
+      tawaf:"الطواف",sai:"السعي",mark:"حدّد الكعبة",markHere:"حدّد هذا الموضع",
+      voice:"أمر صوتي",listening:"جارٍ الاستماع…",reset:"إعادة",again:"ابدأ من جديد",
+      of7c:"من ٧ أشواط",of7l:"من ٧ أشواط",
+      g:{onPath:"على المسار",acquiring:"جارٍ تحديد المسار…",driftingIn:"قريب جدًا — ابتعد",
+         driftingOut:"بعيد جدًا — اقترب",reversing:"اتجاه خاطئ"},
+      dua:["الدعاء متوقف","الدعاء: تذكير","الدعاء: تلاوة"],
+      det:[["كرسي","١٫٢"],["شخص","٢٫٠"],["طاولة","٢٫٤"]],
+      chip:(d)=>`انتبه، كرسي قريب على يسارك`},
+  ur:{name:"اردو",rtl:true,choose:"اپنی عبادت منتخب کریں: طواف یا سعی۔",
+      markPrompt:"میز کی طرف اشارہ کریں، پھر کعبہ نشان زد کریں۔",
+      markSafa:"آغاز، صفا کی طرف اشارہ کریں، پھر نشان لگائیں۔",
+      markMarwah:"اب دوسرے سرے، مروہ کی طرف اشارہ کریں۔",
+      begin:"کعبہ نشان زد۔ چکر شروع کریں۔",
+      tawafDone:"طواف مکمل۔",saiDone:"سعی مکمل۔",
+      tawaf:"طواف",sai:"سعی",mark:"کعبہ نشان زد کریں",markHere:"یہ جگہ نشان زد کریں",
+      voice:"صوتی کمانڈ",listening:"سن رہا ہے…",reset:"دوبارہ",again:"دوبارہ شروع",
+      of7c:"سات میں سے",of7l:"سات میں سے",
+      g:{onPath:"راستے پر",acquiring:"مدار تلاش ہو رہا ہے…",driftingIn:"بہت قریب — باہر ہوں",
+         driftingOut:"بہت دور — اندر آئیں",reversing:"غلط سمت"},
+      dua:["دعا بند","دعا: یاد دہانی","دعا: تلاوت"],
+      det:[["کرسی","1.2"],["شخص","2.0"],["میز","2.4"]],
+      chip:(d)=>`خیال رکھیں، کرسی قریب ہے`}
+};
+
+function newState(o={}){return Object.assign({
+  phase:'idle', ritual:'tawaf', count:0, progress:0, trackingOK:true,
+  guidanceOn:false, guidanceState:'onPath', steerLeft:true,
+  muted:false, dua:0, debug:false, lang:'en',
+  speaking:false, listening:false, showDet:true, showChip:false, launch:false
+},o);}
+
+/* Faithful to DemoView.swift: statusLine comes from refreshStatus() */
+function statusLine(s){const t=L[s.lang];
+  if(s.phase==='idle')return t.choose;
+  if(s.phase==='marking')return s.ritual==='tawaf'?t.markPrompt:t.markSafa;
+  if(s.phase==='markingSecond')return t.markMarwah;
+  if(s.phase==='tawaf'||s.phase==='sai')return t.begin;
+  return s.ritual==='tawaf'?t.tawafDone:t.saiDone;}
+
+function phoneHTML(s,id){
+  const t=L[s.lang], walking=(s.phase==='tawaf'||s.phase==='sai');
+  const showRing=walking||s.phase==='complete';
+  const showG=s.guidanceOn&&walking;
+  const gold='#D4AD54', C=2*Math.PI*66;
+  const frac=(s.count+s.progress)/7;
+  return `<div class="phone"><div class="screen">
+   <div class="cam ${s.debug?'mesh':''}"></div><div class="notch"></div>
+   <div class="ui ${t.rtl?'rtl':''}">
+     <div class="topbar">
+       <div class="langpill" data-act="lang" data-id="${id}">${ic('globe')}<span>${t.name}</span></div>
+       <div class="spacer" style="flex:1"></div>
+       ${s.speaking?`<span style="color:${gold};display:inline-flex;width:18px">${I.waveform}</span>`:''}
+       <div class="tb ${s.muted?'red':'off'}" data-act="mute" data-id="${id}" title="Mute obstacle warnings">
+         ${I[s.muted?'speaker.slash.fill':'speaker.wave.2.fill']}</div>
+       <div class="tb ${s.guidanceOn?'on':'off'}" data-act="guide" data-id="${id}" title="Walk guidance">
+         ${I[s.guidanceOn?'figure.walk.circle.fill':'figure.walk.circle']}</div>
+       <div class="tb ${s.dua>0?'on':'off'}" data-act="dua" data-id="${id}" title="${t.dua[s.dua]}">
+         ${I[s.dua===2?'hands.sparkles.fill':'hands.sparkles']}</div>
+       <div class="tb ${s.debug?'on':'off'}" data-act="debug" data-id="${id}" title="LiDAR debug view">
+         ${I[s.debug?'cube.transparent.fill':'cube.transparent']}</div>
+     </div>
+     <div class="ink banner"><span class="led" style="background:${s.trackingOK?'#4CB963':'#E8912D'}"></span>
+       <span>${statusLine(s)}</span></div>
+     ${showG?`<div class="ink gbanner">
+       <span style="color:${s.guidanceState==='onPath'?'#4CB963':gold};display:inline-flex;width:16px">
+         ${I[s.guidanceState==='onPath'?'checkmark.circle.fill':'arrow.triangle.turn.up.right.circle.fill']}</span>
+       <span>${t.g[s.guidanceState]}</span></div>`:''}
+     ${(s.showDet&&walking)?`<div class="ink det">${t.det.slice(0,3).map(d=>
+       `<div class="detrow"><span style="color:${gold};display:inline-flex;width:13px">${I.viewfinder}</span>
+        <span>${d[0]}</span><span class="d">${d[1]} m</span></div>`).join('')}</div>`:''}
+     <div class="spacer"></div>
+     ${showRing?`<div class="ring"><svg width="146" height="146" viewBox="0 0 146 146">
+        <circle cx="73" cy="73" r="66" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="11"/>
+        <circle cx="73" cy="73" r="66" fill="none" stroke="${gold}" stroke-width="11"
+          stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-frac)}"/></svg>
+        <div class="ringtxt"><b>${s.lang==='ar'?'٠١٢٣٤٥٦٧'[s.count]:s.count}</b>
+        <span>${s.ritual==='tawaf'?t.of7c:t.of7l}</span></div></div>`:''}
+     <div class="spacer"></div>
+     ${s.showChip&&walking?`<div class="chip">${ic('figure.walk.motion')}<span>${t.chip('1.2')}</span></div>`:''}
+     <div class="btnrow">${bigButtons(s,id)}</div>
+     ${(s.phase==='marking'||s.phase==='markingSecond'||walking)?
+       `<button class="reset" data-act="reset" data-id="${id}">${ic('arrow.counterclockwise')} ${t.reset}</button>`:''}
+   </div>
+   ${s.launch?`<div class="launch"><div style="font-size:34px">🕋</div>
+     <div style="font-family:serif;font-size:21px;color:#fff">${t.tawaf}</div>
+     <div style="color:${gold};font-size:12px">AI Umrah Companion</div></div>`:''}
+  </div></div>`;
+}
+function bigButtons(s,id){const t=L[s.lang];
+  switch(s.phase){
+   case 'idle': return `<button class="big gold" data-act="pickTawaf" data-id="${id}">${ic('circle.circle')}${t.tawaf}</button>
+     <button class="big green" data-act="pickSai" data-id="${id}">${ic('arrow.left.arrow.right')}${t.sai}</button>`;
+   case 'marking': case 'markingSecond':
+     return `<button class="big gold" data-act="mark" data-id="${id}">${ic('scope')}${s.ritual==='tawaf'?t.mark:t.markHere}</button>`;
+   case 'tawaf': case 'sai':
+     return `<button class="big blue" data-act="voice" data-id="${id}">${ic('mic.fill')}${s.listening?t.listening:t.voice}</button>`;
+   default:
+     return `<button class="big gold" data-act="again" data-id="${id}">${ic('arrow.counterclockwise')}${t.again}</button>`;
+  }
+}
+</script>
+<script>
+const P = {};                     /* live phone states, keyed by id */
+const slides = [];
+
+/* ---------- 1. title ---------- */
+slides.push(`
+<div class="kicker">AI Umrah Companion · UX walkthrough</div>
+<h1>A voice-first companion for blind pilgrims<br>performing <span style="color:var(--gold)">Tawaf</span> and <span style="color:var(--gold)">Sa'i</span></h1>
+<p class="lede">Native iOS. On-device computer vision, LiDAR ranging and ARKit spatial tracking, with
+audio guidance. This deck documents <b>the screen exactly as built</b> — every button, every state —
+and then proposes a fix for the one piece of substantive feedback we received: <b>too much sound.</b></p>
+<div class="rule"></div>
+<div class="grid g3">
+  <div class="card"><h4>Part 1 — The UX as built</h4><p>Every control, every phase, drawn from
+  <code>DemoView.swift</code> and <code>CompanionViewModel.swift</code>. Interactive: the phone on
+  each slide is live, so you can press the buttons.</p></div>
+  <div class="card"><h4>Part 2 — The audio problem</h4><p>An audit of all eight sound sources that
+  can fire at once, and the code-level reason they pile up. You can hear it.</p></div>
+  <div class="card"><h4>Part 3 — The redesign</h4><p>Silence as the default state, a single
+  priority-arbitrated cue bus, earcons and haptics before speech, and three verbosity levels.</p></div>
+</div>
+<div class="note"><p><b>Scope, stated plainly:</b> this is a <b>training and rehearsal tool</b>, and an
+assistive aid. It is not a replacement for a white cane, a human companion, or official accessibility
+support, and it is not currently validated for use inside the Haram during Hajj or Umrah.</p></div>`);
+
+/* ---------- 2. one screen, annotated ---------- */
+slides.push(`
+<h2>One screen. No navigation stack.</h2>
+<p class="lede">Screen-to-screen navigation is hostile to blind users — you lose your place and there
+is no spatial memory to fall back on. So both rituals are <b>modes on a single screen</b>, driven by a
+phase machine. Nothing is ever more than one press away.</p>
+<div class="split" style="margin-top:20px">
+  <div id="ph-main"></div>
+  <div>
+    <h3>What you are looking at</h3>
+    <div class="callout"><b>1</b><div><b>Camera feed, full bleed.</b> The live ARKit view. For a blind
+      user it is irrelevant — it exists for the sighted person helping them, and for low-vision users.</div></div>
+    <div class="callout"><b>2</b><div><b>Status banner.</b> The current instruction in words, with a
+      tracking LED — <span style="color:var(--grn)">green</span> when ARKit tracking is normal,
+      <span style="color:var(--org)">amber</span> when degraded. Combined into one VoiceOver element.</div></div>
+    <div class="callout"><b>3</b><div><b>Guidance banner.</b> Only appears when walk guidance is on and
+      a ritual is in progress. <code>accessibilityHidden</code> — deliberately: the beacon and spoken
+      cues already carry this non-visually, so exposing it to VoiceOver would duplicate it.</div></div>
+    <div class="callout"><b>4</b><div><b>"What I see" readout.</b> The three nearest detected objects
+      with LiDAR distance. Also <code>accessibilityHidden</code>; spoken warnings cover it.</div></div>
+    <div class="callout"><b>5</b><div><b>Circuit ring.</b> Completed circuits out of 7, filling
+      continuously with progress through the current one. Arabic-Indic numerals in Arabic.</div></div>
+    <div class="callout"><b>6</b><div><b>Primary action.</b> One big 62pt-tall button whose meaning
+      changes with the phase. Plus an always-available Reset once a ritual has started.</div></div>
+    <div class="note" style="margin-top:16px"><p><b>Two gestures work anywhere on the screen:</b>
+      double-tap (for sighted users) and the VoiceOver two-finger magic-tap (for blind users). Both
+      open the microphone. A blind user never has to find the mic button.</p></div>
+  </div>
+</div>`);
+P['ph-main']=newState({loop:true,phase:'tawaf',count:3,progress:.4,guidanceOn:true,guidanceState:'onPath',showDet:true});
+
+/* ---------- 3. top bar ---------- */
+slides.push(`
+<h2>The top bar — five controls, each a toggle</h2>
+<p class="lede">All five are reachable one-handed and VoiceOver-labelled. Gold means active.
+Everything defaults to <b>off</b> except the language, because a first-time user should not be
+dropped into a wall of sound.</p>
+<div class="split" style="margin-top:16px">
+  <div id="ph-top"></div>
+  <div>
+  <table>
+  <tr><th>Icon</th><th>Control</th><th>States</th><th>What it actually does</th></tr>
+  <tr><td class="ic" style="color:#fff">${I.globe}</td><td><b>Language</b></td>
+      <td><span class="tag t-neu">English</span><span class="tag t-neu">العربية</span><span class="tag t-neu">اردو</span></td>
+      <td>Switches UI text, <b>voice language</b>, and layout direction to right-to-left for Arabic and
+      Urdu. Numerals switch to Arabic-Indic in Arabic. Try it on the phone.</td></tr>
+  <tr><td class="ic" style="color:#fff">${I['speaker.wave.2.fill']}</td><td><b>Mute warnings</b></td>
+      <td><span class="tag t-neu">on</span><span class="tag t-gap">muted (red)</span></td>
+      <td>Silences <b>only</b> the automatic obstacle warnings. Ritual announcements, du'a and
+      on-demand answers still speak, and the on-screen readout still updates. This exists because
+      testers found the warnings useful but nagging — which is the whole problem this deck addresses.</td></tr>
+  <tr><td class="ic" style="color:#fff">${I['figure.walk.circle']}</td><td><b>Walk guidance</b></td>
+      <td><span class="tag t-neu">off — default</span><span class="tag t-new">on (gold)</span></td>
+      <td>Starts the continuous audio beacon and the spoken drift corrections. Only audible while a
+      ritual is actually in progress. Auto-pauses whenever the microphone opens, then resumes.</td></tr>
+  <tr><td class="ic" style="color:#fff">${I['hands.sparkles']}</td><td><b>Du'a</b></td>
+      <td><span class="tag t-neu">off — default</span><span class="tag t-new">prompt</span><span class="tag t-new">recite</span></td>
+      <td><b>Three states, not two.</b> One tap gives you <i>prompt</i> ("you may make your du'a now");
+      a <b>second</b> tap gives <i>recite</i>, where the app says the supplication itself. Never
+      prescriptive — du'a during Tawaf is free. A safety warning cuts through a recitation mid-word.</td></tr>
+  <tr><td class="ic" style="color:#fff">${I['cube.transparent']}</td><td><b>LiDAR debug</b></td>
+      <td><span class="tag t-neu">off</span><span class="tag t-new">mesh on</span></td>
+      <td>Overlays the reconstructed room mesh, feature points and world origin. Purely a
+      demonstration device — it shows an audience how the phone perceives the room. Toggle it on the
+      phone to see the wireframe.</td></tr>
+  </table>
+  <div class="note warn"><p><b>Known usability defect.</b> The du'a button being a three-state cycle
+  with one icon is not discoverable — in testing it read as broken, because one tap lands on
+  <i>prompt</i> and the user expected recitation. Fix: either announce the new state on every tap
+  (it does speak, but the confirmation is easy to miss under other audio) or split into a two-item
+  menu.</p></div>
+  </div>
+</div>`);
+P['ph-top']=newState({loop:true,phase:'tawaf',count:2,progress:.6,guidanceOn:true,showDet:true});
+
+/* ---------- 4. phase machine ---------- */
+slides.push(`
+<h2>The phase machine — press through it</h2>
+<p class="lede">One state machine drives both rituals.
+<code>idle → marking → tawaf → complete</code> for Tawaf;
+<code>idle → marking(Safa) → markingSecond(Marwah) → sai → complete</code> for Sa'i.
+The big button's meaning, the status line and the spoken prompt all derive from the phase.</p>
+<div class="split" style="margin-top:16px">
+  <div id="ph-phase"></div>
+  <div>
+    <h3>Drive it</h3>
+    <p style="font-size:14px">Use the phone's own buttons, or jump straight to a phase:</p>
+    <div class="states" id="phasebtns"></div>
+    <div class="rule"></div>
+    <table>
+    <tr><th>Phase</th><th>Big button</th><th>Spoken on entry</th></tr>
+    <tr><td><code>idle</code></td><td>Tawaf · Sa'i</td><td class="dim">— (status only)</td></tr>
+    <tr><td><code>marking</code></td><td>Mark the Kaaba</td>
+        <td>"Point at the table, then tap to mark the Kaaba."</td></tr>
+    <tr><td><code>markingSecond</code><br><small>Sa'i only</small></td><td>Mark this spot</td>
+        <td>"Now point at the far end, Marwah, and tap."</td></tr>
+    <tr><td><code>tawaf</code></td><td>Voice command</td>
+        <td>"Kaaba marked. You may begin your Tawaf. Walk slowly, counter-clockwise."</td></tr>
+    <tr><td><code>sai</code></td><td>Voice command</td>
+        <td>"Both ends marked. Begin your Sa'i. Walk toward Marwah."</td></tr>
+    <tr><td><code>complete</code></td><td>Start again</td>
+        <td>"Your seventh circuit is complete. Your Tawaf is finished. May it be accepted."</td></tr>
+    </table>
+    <div class="note"><p><b>Marking is a camera raycast, not a GPS fix.</b> Tapping Mark casts a ray
+    from the centre of the screen onto a detected surface and anchors the virtual Kaaba there. The
+    circuit counter is then <b>purely angular</b> — it has no distance parameter at all, so the same
+    code counts laps around a coffee table and around the Kaaba itself.</p></div>
+  </div>
+</div>`);
+P['ph-phase']=newState({phase:'idle'});
+
+/* ---------- 5. voice ---------- */
+slides.push(`
+<h2>The voice layer — one entry point, three ways in</h2>
+<div class="grid g3" style="margin-bottom:22px">
+  <div class="card"><h4>Mic button</h4><p>The primary action while walking. Tap to start, tap again to
+  stop — with an 8-second safety auto-stop so it can never wedge open.</p></div>
+  <div class="card"><h4>Double-tap anywhere</h4><p>For sighted users and low-vision users who don't
+  want to hunt for a target.</p></div>
+  <div class="card"><h4>VoiceOver magic-tap</h4><p>Two-finger double-tap — the standard iOS gesture a
+  blind user already knows. This is the one that matters.</p></div>
+</div>
+<div class="split">
+<div>
+<h3>Command grammar</h3>
+<p style="font-size:14.5px">A <b>fixed grammar matched on-device</b> — no cloud, no model, no latency.
+21 test cases, all three languages. Everything below works in English, Arabic and Urdu.</p>
+<table>
+<tr><th>Say</th><th>Effect</th></tr>
+<tr><td>"tawaf" / "sa'i"</td><td>Pick the ritual (idle only)</td></tr>
+<tr><td>"mark"</td><td>Mark the current point</td></tr>
+<tr><td>"guidance" / "guide me"</td><td>Toggle walk guidance</td></tr>
+<tr><td>"mute"</td><td>Toggle obstacle warnings</td></tr>
+<tr><td>"du'a"</td><td>Cycle off → prompt → recite</td></tr>
+<tr><td>"how many" / "count"</td><td>Speak progress: "3 of 7 circuits complete"</td></tr>
+<tr><td>"start again" / "reset"</td><td>Reset to idle</td></tr>
+<tr><td>"what can I say"</td><td>Speak the command list</td></tr>
+</table>
+</div>
+<div>
+<h3>Design decisions worth defending</h3>
+<ul>
+<li><b>The beacon stops while the mic is open.</b> Not for politeness — the audio session has to be
+handed to the recogniser, and an earlier build wedged permanently because it wasn't released.</li>
+<li><b>An unrecognised phrase is not an error.</b> It falls through to the command list rather than
+"sorry, I didn't understand" — a dead end is worse than a reminder.</li>
+<li><b>Open-ended scene Q&amp;A is currently switched off</b> (<code>sceneAnswerEnabled = false</code>).
+It was the least reliable thing to show live. Object detection and obstacle warnings are unaffected —
+only the free-form "describe what's around me" answer is gated. One flag restores it.</li>
+<li><b>No wake word.</b> Always-listening means always-recording, which breaks the privacy contract
+and drains the battery. An explicit gesture is the honest trade.</li>
+</ul>
+<div class="note"><p><b>Privacy contract, unchanged since day one:</b> video never leaves the device.
+Detection, ranging, tracking, speech recognition and speech synthesis all run locally. The app is
+fully functional in airplane mode — there is no network call on any path at present.</p></div>
+</div>
+</div>`);
+
+/* ---------- 6. guidance models ---------- */
+slides.push(`
+<h2>How guidance is computed</h2>
+<p class="lede">Two rituals, two geometries, one principle: <b>heading error and position error are
+independent outputs</b>, never mixed into a single "you're wrong" signal. A pilgrim can be on the
+right circle facing the wrong way, or facing correctly but drifting off it. Those need different
+corrections.</p>
+<div class="grid g2" style="margin-top:18px">
+  <div class="card"><h4>Tawaf — an orbit</h4>
+    <p style="margin-bottom:10px">The orbit radius is <b>learned</b> from the first ~30 moving samples.
+    Nothing is hard-coded, so it works at table scale and at Mataf scale.</p>
+    <table style="font-size:13px">
+    <tr><th>State</th><th>Meaning</th></tr>
+    <tr><td><code>acquiring</code></td><td>Still learning the orbit — silent</td></tr>
+    <tr><td><code>onPath</code></td><td>On the circle, aimed correctly</td></tr>
+    <tr><td><code>driftingIn</code></td><td>Closing on the Kaaba → "ease outward"</td></tr>
+    <tr><td><code>driftingOut</code></td><td>Widening away → "ease inward"</td></tr>
+    <tr><td><code>reversing</code></td><td>Going clockwise — the wrong way</td></tr>
+    </table>
+    <p style="margin-top:10px"><small>Verified headlessly: 9 of 9 cases, including radius learned
+    correctly at both 0.7 m and 5 m, and clockwise walking flagged as reversing.</small></p></div>
+  <div class="card"><h4>Sa'i — a line</h4>
+    <p style="margin-bottom:10px">Position is projected onto the Safa→Marwah line. Two failure modes,
+    each detected separately:</p>
+    <table style="font-size:13px">
+    <tr><th>Signal</th><th>Detection</th></tr>
+    <tr><td><b>Wrong way</b></td><td>Smoothed progress-toward-target goes negative → "turn around and
+    head toward Marwah"</td></tr>
+    <tr><td><b>Off the path</b></td><td>Perpendicular offset from the line exceeds 15% of the marked
+    leg length → "you've veered off the path"</td></tr>
+    </table>
+    <p style="margin-top:10px"><small>The progress trend is <b>wiped at every turn</b>, otherwise
+    arriving at an endpoint and turning round would instantly read as "wrong way". Tolerances are
+    fractions of the marked distance, so they scale from a living room to the real 450 m Mas'a.</small></p></div>
+</div>
+<div class="note"><p><b>The honest limitation.</b> Both models assume ARKit's pose is trustworthy. In a
+dense crowd it is not — moving bodies occlude the visual features ARKit needs, and drift accumulates
+in exactly the conditions where LiDAR is also saturated by people at half a metre. Adding a fourth
+sensor does not fix this, because the failures are <b>correlated</b>. What fixes it is detecting the
+degradation and saying so — see the last slide.</p></div>`);
+</script>
+<script>
+/* ---------- 7. the audit ---------- */
+slides.push(`
+<div class="kicker">Part 2 — the problem</div>
+<h2>Eight sound sources. One ear.</h2>
+<p class="lede">The feedback was "you overwhelm the user with too many sound instructions." It is
+correct. Here is every channel that can be live simultaneously during a single Tawaf circuit with
+guidance and du'a switched on.</p>
+<table style="margin-top:14px">
+<tr><th>#</th><th>Source</th><th>Type</th><th>Rate</th><th>Gating</th></tr>
+<tr><td>1</td><td>Beacon tick — 440 Hz, stereo-panned by heading error</td><td>continuous tone</td>
+    <td><b>3.2 / second</b></td><td class="dim">none while walking</td></tr>
+<tr><td>2</td><td>On-axis confirmation tone — 660 Hz</td><td>continuous tone</td>
+    <td>whenever aimed correctly</td><td class="dim">none</td></tr>
+<tr><td>3</td><td>Radial-drift earcon — 220 Hz, pitch-shifted</td><td>continuous tone</td>
+    <td>whenever outside the band</td><td class="dim">none</td></tr>
+<tr><td>4</td><td>Spoken drift corrections — "You're drifting toward the Kaaba. Ease outward."</td>
+    <td>speech</td><td>up to <b>20 / minute</b></td><td>3 s cooldown</td></tr>
+<tr><td>5</td><td>Spoken obstacle warnings — "Careful, chair is close, 1.2 metres on your left."</td>
+    <td>speech</td><td>up to <b>15 / minute</b></td><td>4 s cooldown</td></tr>
+<tr><td>6</td><td>Circuit announcements — "Circuit 3 of seven complete."</td><td>speech</td>
+    <td>1 per circuit</td><td class="dim">none</td></tr>
+<tr><td>7</td><td>Du'a — prompt, or the full supplication in recite mode</td><td>speech</td>
+    <td>1 per circuit</td><td>safety interrupts it</td></tr>
+<tr><td>8</td><td>Command confirmations — "Walk guidance on."</td><td>speech</td>
+    <td>per interaction</td><td class="dim">none</td></tr>
+</table>
+<div class="grid g3" style="margin-top:20px">
+  <div class="card metric"><div class="big-num">3</div><small>continuous synthesised tones layered at
+  once — a chord the user has to decompose while walking</small></div>
+  <div class="card metric"><div class="big-num">~105s</div><small>of speech <b>demanded</b> per 60 s of
+  walking, worst case (20 × 2.7 s + 15 × 3.4 s at the default speech rate)</small></div>
+  <div class="card metric"><div class="big-num">175%</div><small>oversubscribed. The channel
+  physically cannot deliver it, so speech becomes <b>continuous and late</b></small></div>
+</div>`);
+
+/* ---------- 8. root cause ---------- */
+slides.push(`
+<h2>The root cause is not the cue count. It's the queue.</h2>
+<p class="lede">"Too many instructions" is the symptom. The mechanism is in
+<code>SpeechService.speak</code>, which has <b>no queue management of any kind</b>.</p>
+<div class="grid g2" style="margin-top:8px">
+<div>
+<h3>What the code does today</h3>
+<div class="card" style="font-family:var(--mono);font-size:12.5px;line-height:1.7;background:rgba(0,0,0,.35)">
+func speak(_ text: String,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; interrupting: Bool = true) {<br>
+&nbsp;&nbsp;if interrupting, synth.isSpeaking {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;synth.stopSpeaking(at: .immediate)<br>
+&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;...<br>
+&nbsp;&nbsp;<span style="color:#E5484D">synth.speak(u)</span>&nbsp;&nbsp;<span style="color:#93A5A3">// unbounded FIFO</span><br>
+}
+</div>
+<p style="margin-top:14px">Two behaviours, both wrong for this use case:</p>
+<ul>
+<li><code>interrupting: true</code> — <b>truncates</b> whatever is mid-sentence. Used for command
+confirmations, so a confirmation can cut a safety warning in half.</li>
+<li><code>interrupting: false</code> — <b>appends to an unbounded FIFO</b>. Used for every guidance
+cue, obstacle warning, circuit announcement and du'a.</li>
+</ul>
+<div class="note warn"><p>Nothing is ever <b>dropped</b>. At 175% oversubscription the queue only
+grows, and every utterance plays back-to-back with no gap. The user hears one unbroken monologue,
+and each correction describes a situation that is already several seconds stale.</p></div>
+</div>
+<div>
+<h3>The four compounding faults</h3>
+<div class="card" style="margin-bottom:12px"><h4>1 · Independent cooldowns, one channel</h4>
+<p>The 3 s guidance timer and the 4 s obstacle timer never consult each other. Two well-behaved
+limiters feeding one pipe produce an effective spacing of ~1.5 s.</p></div>
+<div class="card" style="margin-bottom:12px"><h4>2 · Sentences where a word would do</h4>
+<p>"You're drifting toward the Kaaba. Ease outward." is 8 words and 2.7 seconds. The actionable
+content is one word: <b>outward</b>. Blind-navigation practice is 1–2 words, or a tone.</p></div>
+<div class="card" style="margin-bottom:12px"><h4>3 · Correctness is not silent</h4>
+<p>Walking perfectly still produces 3.2 ticks per second plus a lock tone. Sound therefore carries no
+information — it is always on, so the user learns to tune it out, including the warnings.</p></div>
+<div class="card"><h4>4 · No haptic channel at all</h4>
+<p>Zero haptic calls in the codebase. Every scrap of urgency has to be expressed in audio, which is
+why speech ended up carrying safety.</p></div>
+</div>
+</div>`);
+
+/* ---------- 9. hear it ---------- */
+slides.push(`
+<h2>Hear the difference</h2>
+<p class="lede">Real frequencies and real cadences from the source — 440 Hz beacon at 3.2 per second,
+660 Hz lock tone, 220 Hz drift earcon, and the actual spoken strings. Headphones recommended.
+<b>Close your eyes and try to walk a circle to it.</b></p>
+<div class="grid g2" style="margin-top:18px">
+  <div class="audiobox">
+    <h3 style="color:var(--red)">As built today</h3>
+    <p style="font-size:14px">All three tones plus speech at the current cooldowns. 20 seconds.</p>
+    <div class="playrow">
+      <button class="play" id="btn-now" onclick="playCurrent()">▶ Play current design</button>
+      <button class="play ghost" onclick="stopAudio()">■ Stop</button>
+    </div>
+    <div id="lognow"></div>
+  </div>
+  <div class="audiobox" style="border-color:rgba(76,185,99,.4);background:linear-gradient(160deg,rgba(76,185,99,.08),transparent)">
+    <h3 style="color:var(--grn)">Proposed</h3>
+    <p style="font-size:14px">Silence while on path. Earcons for corrections, one word if it persists,
+    a sentence only for events. Same 20 seconds, same walk.</p>
+    <div class="playrow">
+      <button class="play" id="btn-new" style="background:var(--grn);color:#08130b" onclick="playProposed()">▶ Play proposed design</button>
+      <button class="play ghost" style="color:var(--grn);border-color:rgba(76,185,99,.5)" onclick="stopAudio()">■ Stop</button>
+    </div>
+    <div id="lognew" style="font-family:var(--mono);font-size:12px;color:var(--grn);min-height:18px;margin-top:9px"></div>
+  </div>
+</div>
+<div class="rule"></div>
+<h3>The same 20 seconds, drawn</h3>
+<div class="tl" id="tl-now"><span class="lab">CURRENT</span><small>continuous tone bed + 11 spoken sentences</small></div>
+<div class="tl" id="tl-new"><span class="lab">PROPOSED</span><small>3 spoken words · 4 earcons · 4 haptics · mostly silence</small></div>
+<div class="legend">
+  <span><span class="sw" style="background:rgba(229,72,77,.85)"></span>spoken sentence</span>
+  <span><span class="sw" style="background:rgba(212,173,84,.9)"></span>earcon / one word</span>
+  <span><span class="sw" style="background:rgba(59,130,246,.9)"></span>haptic</span>
+  <span><span class="sw" style="background:repeating-linear-gradient(90deg,rgba(212,173,84,.75) 0 3px,transparent 3px 8px)"></span>continuous tone bed</span>
+</div>
+<div class="note"><p><b>Note what the proposed track does when nothing is wrong: nothing.</b> That is the
+entire design change. Sound becomes information again because its absence means "you are fine".</p></div>`);
+
+/* ---------- 10. the redesign ---------- */
+slides.push(`
+<div class="kicker">Part 3 — the redesign</div>
+<h2>Silence is the default state</h2>
+<p class="lede">Eight changes. The first three do most of the work; the rest stop the problem
+recurring as features are added.</p>
+<div class="grid g2" style="margin-top:16px">
+<div>
+<div class="card" style="margin-bottom:12px"><h4>1 · <code>CueBus</code> — one arbiter</h4>
+<p>Every call to <code>speech.speak</code> is replaced by <code>cues.post(_:priority:)</code>.
+Five priorities: <b>safety → ritual → correction → du'a → chrome</b>. One slot, <b>no queue</b>. A
+higher priority pre-empts; equal or lower is <b>dropped</b>, not deferred. A stale cue is worse than
+no cue.</p></div>
+<div class="card" style="margin-bottom:12px"><h4>2 · A global silence floor</h4>
+<p>A single <code>minSilence = 2.0 s</code> gap between <i>any</i> two utterances, enforced in one
+place. This alone caps speech at ~30% duty cycle instead of 175%.</p></div>
+<div class="card" style="margin-bottom:12px"><h4>3 · Invert the beacon</h4>
+<p>Delete the always-on tick and the on-axis lock tone. Beacon amplitude becomes
+<b>proportional to heading error</b>, and <b>zero inside the dead-band</b>. Three continuous tones
+become one, audible only when it means something.</p></div>
+<div class="card"><h4>4 · Escalation ladder</h4>
+<p>Per persistent error: <b>earcon at 0 s → one word at 4 s → full sentence at 10 s</b>. Someone
+walking well hears almost nothing; someone genuinely lost gets progressively more help. Today both
+get the same wall of sentences.</p></div>
+</div>
+<div>
+<div class="card" style="margin-bottom:12px"><h4>5 · Obstacle novelty filter</h4>
+<p>Key each obstacle on <i>(label, bearing bucket, distance bucket)</i>. Re-announce only if it is new
+or has closed by ≥ 0.4 m. Today the same chair is announced every 4 seconds — almost certainly the
+single largest source of the nagging.</p></div>
+<div class="card" style="margin-bottom:12px"><h4>6 · Haptics carry urgency</h4>
+<p>Light tap = circuit complete. Soft double = a correction is available. Sharp triple = obstacle.
+This takes safety off the speech channel entirely, and it works when the Mataf is too loud for audio
+— which it is.</p></div>
+<div class="card" style="margin-bottom:12px"><h4>7 · Three verbosity levels + speech rate</h4>
+<p><b>Minimal</b> (haptics and earcons only) · <b>Standard</b> (the ladder above) ·
+<b>Learning</b> (today's behaviour, for a first-time user). Plus a speech-rate control defaulting
+<b>above</b> Apple's default, which experienced screen-reader users find sluggish.</p></div>
+<div class="card"><h4>8 · A hard budget</h4>
+<p>Cap: <b>4 spoken events per 30 s</b>. Overflow degrades to earcons automatically. Even if the
+thresholds are mistuned, the system cannot flood the user — the failure mode becomes quiet rather
+than deafening.</p></div>
+</div>
+</div>`);
+
+/* ---------- 11. cue ladder ---------- */
+slides.push(`
+<h2>What the user actually hears, after</h2>
+<table>
+<tr><th>Situation</th><th>Today</th><th>Proposed</th></tr>
+<tr><td><b>Walking correctly</b></td>
+    <td>3.2 beacon ticks/sec + 660 Hz lock tone, indefinitely</td>
+    <td class="t-done" style="color:var(--grn)"><b>Silence.</b></td></tr>
+<tr><td><b>Drifting outward, briefly</b></td>
+    <td>"You're drifting too far out. Ease inward." — 2.7 s, repeating every 3 s</td>
+    <td>Two-note descending earcon, 180 ms. Haptic double-tap.</td></tr>
+<tr><td><b>Still drifting after 4 s</b></td><td>the same sentence again</td>
+    <td>One word: <b>"Inward."</b></td></tr>
+<tr><td><b>Still drifting after 10 s</b></td><td>the same sentence again</td>
+    <td>Full sentence — the user clearly needs it now.</td></tr>
+<tr><td><b>Walking clockwise</b></td><td>"Wrong way. Turn around and keep the Kaaba on your left."</td>
+    <td>Sharp haptic + <b>"Turn around."</b> Pre-empts everything below safety.</td></tr>
+<tr><td><b>Same chair, 1.2 m, for 30 s</b></td>
+    <td>7 identical warnings</td>
+    <td><b>One</b> warning. Re-announced only if it closes by 0.4 m.</td></tr>
+<tr><td><b>Circuit completed</b></td><td>"Circuit 3 of seven complete." + du'a immediately after</td>
+    <td>Haptic tap + "Three." Du'a follows only after 5 s of quiet.</td></tr>
+<tr><td><b>ARKit tracking degrades</b></td>
+    <td class="t-gap" style="color:var(--red)"><b>Nothing — it keeps confidently guiding off a drifting pose.</b></td>
+    <td>Guidance stops. "I've lost track — stop walking."</td></tr>
+</table>
+<div class="note warn"><p><b>That last row is the most important line in this deck</b>, and it is not
+about overwhelm. Today, if ARKit tracking degrades — which is exactly what a crowd causes — the app
+carries on issuing confident directions computed from a pose it should not trust. Silence, or an
+explicit "I've lost you", is the only safe behaviour. It is a small change and it should ship before
+any further testing with a blind user.</p></div>`);
+
+/* ---------- 12. settings mock ---------- */
+slides.push(`
+<h2>Giving the user the controls</h2>
+<p class="lede">The reviewer asked for selectable language, du'a, voice speed and level of guidance.
+Language and du'a already exist. Verbosity and speech rate are new, and they are the cheapest items
+on the list.</p>
+<div class="split" style="margin-top:18px">
+<div id="ph-set"></div>
+<div>
+<h3>Proposed settings sheet</h3>
+<div class="card" style="margin-bottom:12px"><h4>Guidance level</h4>
+<div class="states">
+ <button class="sbtn" onclick="setVerb(this,0)">Minimal</button>
+ <button class="sbtn on" onclick="setVerb(this,1)">Standard</button>
+ <button class="sbtn" onclick="setVerb(this,2)">Learning</button>
+</div>
+<p style="margin-top:10px;font-size:13.5px" id="verbdesc">Earcons and haptics, escalating to one word,
+then a full sentence only if the error persists past 10 seconds.</p></div>
+<div class="card" style="margin-bottom:12px"><h4>Voice speed</h4>
+<p>A slider, defaulting <b>faster than Apple's default</b>. Today it is hard-coded to
+<code>AVSpeechUtteranceDefaultSpeechRate</code>, which experienced blind users consistently
+describe as too slow.</p></div>
+<div class="card"><h4>Already shipped</h4>
+<p><span class="tag t-done">Language · EN / AR / UR</span>
+<span class="tag t-done">Du'a off / prompt / recite</span>
+<span class="tag t-done">Mute obstacle warnings</span>
+<span class="tag t-done">Walk guidance on / off</span></p></div>
+<div class="note"><p><b>Defaults matter more than the settings.</b> A blind user should not have to
+configure their way out of being overwhelmed. <b>Minimal</b> is arguably the correct default, with
+Learning offered explicitly on first run.</p></div>
+</div>
+</div>`);
+P['ph-set']=newState({loop:true,phase:'tawaf',count:4,progress:.2,guidanceOn:true,showDet:false});
+
+/* ---------- 13. build order ---------- */
+slides.push(`
+<h2>Build order</h2>
+<p class="lede">Ranked by safety impact per hour of work, not by how impressive it sounds.</p>
+<table style="margin-top:10px">
+<tr><th>#</th><th>Change</th><th>Why now</th><th>Size</th></tr>
+<tr><td>1</td><td><b>Positioning and an in-app disclaimer</b> — training and rehearsal aid, not a
+    replacement for a cane, a companion, or official support</td>
+    <td>Nothing in the app or the repo says this today. It changes how the work is received and it
+    costs a paragraph and one screen.</td><td><span class="tag t-new">hours</span></td></tr>
+<tr><td>2</td><td><b>Tracking-degradation cut-out</b> — watch <code>ARCamera.TrackingState</code>,
+    stop guiding and say so</td>
+    <td>The one genuinely dangerous behaviour in the current build. Cheap.</td>
+    <td><span class="tag t-new">hours</span></td></tr>
+<tr><td>3</td><td><b><code>CueBus</code> + global silence floor + drop-not-queue</b></td>
+    <td>Fixes the reported overwhelm at its mechanism rather than by re-tuning numbers.</td>
+    <td><span class="tag t-new">1–2 days</span></td></tr>
+<tr><td>4</td><td><b>Invert the beacon</b> — silence on path, amplitude ∝ error</td>
+    <td>Removes two of three continuous tones; makes sound informative.</td>
+    <td><span class="tag t-new">half a day</span></td></tr>
+<tr><td>5</td><td><b>Obstacle novelty filter</b></td>
+    <td>Kills the repeated-chair nag. Small, self-contained, high perceived impact.</td>
+    <td><span class="tag t-new">half a day</span></td></tr>
+<tr><td>6</td><td><b>Haptics</b> — three distinguishable urgency patterns</td>
+    <td>Takes safety off the audio channel. Required for any real-world use, where ambient noise
+    makes audio unreliable.</td><td><span class="tag t-new">1 day</span></td></tr>
+<tr><td>7</td><td><b>Verbosity levels + speech rate</b></td><td>Directly requested; cheap.</td>
+    <td><span class="tag t-new">half a day</span></td></tr>
+<tr><td>8</td><td><b>Pause</b>, and an emergency / call-companion action</td>
+    <td>Both were deferred at scoping. Pause is trivial; emergency needs a real design.</td>
+    <td><span class="tag t-neu">1–2 days</span></td></tr>
+<tr><td>9</td><td><b>Religious review</b> of the du'a text and both ritual rule sets</td>
+    <td>Not an engineering task. Needs a qualified reviewer, and it gates any public release.</td>
+    <td><span class="tag t-gap">external</span></td></tr>
+<tr><td>10</td><td><b>Supervised testing with blind users</b> and an accessibility specialist</td>
+    <td>The real gap. Blindfolded-sighted testing is already our protocol and is not a substitute —
+    a lifelong cane user has entirely different expectations of an audio cue.</td>
+    <td><span class="tag t-gap">external</span></td></tr>
+</table>
+<div class="note"><p><b>On the recommendation to add inertial-sensor fusion:</b> ARKit world tracking is
+already visual-inertial — the gyroscope and accelerometer are fused with the camera inside the
+framework — and the app already runs three independent sensing modalities (object detection, LiDAR
+depth, ARKit pose). Adding a fourth sensor is not the missing piece. The real weakness is that in a
+crowd those three fail <b>together</b>, which is why item 2 above is the correct response to that
+concern.</p></div>`);
+</script>
+<script>
+/* ============================================================
+   Deck plumbing
+   ============================================================ */
+const deck=document.getElementById('deck'), dots=document.getElementById('dots');
+let cur=0;
+slides.forEach((html,i)=>{
+  const d=document.createElement('section'); d.className='slide'; d.innerHTML=html; deck.appendChild(d);
+  const t=document.createElement('div'); t.className='dot'; t.onclick=()=>show(i); dots.appendChild(t);
+});
+function show(i){
+  cur=Math.max(0,Math.min(slides.length-1,i));
+  [...deck.children].forEach((s,n)=>s.classList.toggle('on',n===cur));
+  [...dots.children].forEach((s,n)=>s.classList.toggle('on',n===cur));
+  document.getElementById('pos').textContent=(cur+1)+' / '+slides.length;
+  deck.children[cur].scrollTop=0;
+  stopAudio();
+  renderPhones(); drawTimelines(); buildPhaseButtons();
+}
+function go(d){show(cur+d)}
+addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();go(1)}
+  if(e.key==='ArrowLeft'){e.preventDefault();go(-1)}
+  if(e.key==='Escape')stopAudio();
+});
+
+/* ---------- phone rendering + interaction ---------- */
+function renderPhones(){
+  for(const id in P){const el=document.getElementById(id); if(el) el.innerHTML=phoneHTML(P[id],id);}
+}
+document.addEventListener('click',e=>{
+  const n=e.target.closest('[data-act]'); if(!n)return;
+  const id=n.dataset.id, act=n.dataset.act, s=P[id]; if(!s)return;
+  const walking=()=>s.phase==='tawaf'||s.phase==='sai';
+  switch(act){
+    case 'lang':  s.lang={en:'ar',ar:'ur',ur:'en'}[s.lang]; break;
+    case 'mute':  s.muted=!s.muted; break;
+    case 'guide': s.guidanceOn=!s.guidanceOn; break;
+    case 'dua':   s.dua=(s.dua+1)%3; break;
+    case 'debug': s.debug=!s.debug; break;
+    case 'pickTawaf': if(s.phase==='idle'){s.ritual='tawaf';s.phase='marking'} break;
+    case 'pickSai':   if(s.phase==='idle'){s.ritual='sai';s.phase='marking'} break;
+    case 'mark':
+      if(s.phase==='marking'&&s.ritual==='tawaf'){s.phase='tawaf';s.count=0;s.progress=0}
+      else if(s.phase==='marking'){s.phase='markingSecond'}
+      else if(s.phase==='markingSecond'){s.phase='sai';s.count=0;s.progress=0}
+      break;
+    case 'voice':
+      s.listening=!s.listening; renderPhones();
+      if(s.listening) setTimeout(()=>{s.listening=false;s.speaking=true;renderPhones();
+        setTimeout(()=>{s.speaking=false;renderPhones()},1400)},1600);
+      return;
+    case 'again': case 'reset':
+      Object.assign(s,{phase:'idle',count:0,progress:0,guidanceState:'onPath',showChip:false});
+      break;
+  }
+  renderPhones();
+});
+
+/* ---------- gentle walk simulation so the ring and states live ---------- */
+let tick=0;
+setInterval(()=>{
+  tick++;
+  let dirty=false;
+  for(const id in P){const s=P[id];
+    if(s.phase==='tawaf'||s.phase==='sai'){
+      s.progress+=0.085;
+      if(s.progress>=1){s.progress=0;s.count++;
+        if(s.count>=7){ if(s.loop){s.count=0} else {s.count=7;s.phase='complete'} }}
+      if(tick%5===0){
+        const seq=['onPath','onPath','driftingOut','onPath','reversing','onPath','driftingIn','acquiring'];
+        s.guidanceState=seq[(tick/5|0)%seq.length];
+        s.showChip=(tick%20===0)||s.guidanceState==='driftingIn';
+      }
+      dirty=true;
+    }
+  }
+  if(dirty && deck.children[cur].querySelector('.phone')) renderPhones();
+},900);
+
+/* ---------- phase jump buttons (slide 4) ---------- */
+function buildPhaseButtons(){
+  const host=deck.children[cur].querySelector('#phasebtns'); if(!host)return;
+  const s=P['ph-phase'];
+  const opts=[['idle','idle'],['marking','marking'],['markingSecond','markingSecond (Sa\'i)'],
+              ['tawaf','tawaf'],['sai','sai'],['complete','complete']];
+  host.innerHTML=opts.map(([k,lab])=>
+    `<button class="sbtn ${s.phase===k?'on':''}" data-ph="${k}">${lab}</button>`).join('')
+    +`<button class="sbtn ${s.guidanceOn?'on':''}" data-ph="_g">guidance ${s.guidanceOn?'on':'off'}</button>`;
+  host.querySelectorAll('[data-ph]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.ph;
+    if(k==='_g'){s.guidanceOn=!s.guidanceOn}
+    else{s.phase=k; s.ritual=(k==='sai'||k==='markingSecond')?'sai':'tawaf';
+         if(k==='tawaf'||k==='sai'){s.count=2;s.progress=.35}
+         if(k==='complete'){s.count=7;s.progress=0}
+         if(k==='idle'){s.count=0;s.progress=0}}
+    renderPhones(); buildPhaseButtons();
+  });
+}
+function setVerb(btn,n){
+  btn.parentNode.querySelectorAll('.sbtn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  const d=['Haptics and earcons only. No speech at all except ritual events and safety. Arguably the right default.',
+    'Earcons and haptics, escalating to one word, then a full sentence only if the error persists past 10 seconds.',
+    "Today's behaviour — full sentences every time. Appropriate for a first-time user learning what the cues mean, and for nobody else."][n];
+  const el=document.getElementById('verbdesc'); if(el)el.textContent=d;
+}
+
+/* ============================================================
+   Audio demo — real frequencies from GuidanceAudio.swift
+   ============================================================ */
+let ctx=null, nodes=[], timers=[], running=false;
+function AC(){ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); return ctx; }
+function tone(freq,gain,pan){
+  const c=AC(), o=c.createOscillator(), g=c.createGain(), p=c.createStereoPanner();
+  o.frequency.value=freq; o.type='sine'; g.gain.value=gain; p.pan.value=pan||0;
+  o.connect(g).connect(p).connect(c.destination); o.start();
+  nodes.push({o,g,p}); return {o,g,p};
+}
+function say(text,rate){
+  if(!('speechSynthesis' in window))return;
+  const u=new SpeechSynthesisUtterance(text);
+  u.rate=rate||1; u.lang='en-US'; speechSynthesis.speak(u);
+}
+function at(ms,fn){ timers.push(setTimeout(fn,ms)); }
+function stopAudio(){
+  timers.forEach(clearTimeout); timers=[];
+  nodes.forEach(n=>{try{n.o.stop();n.o.disconnect()}catch(e){}}); nodes=[];
+  if('speechSynthesis' in window) speechSynthesis.cancel();
+  running=false;
+  ['lognow','lognew'].forEach(i=>{const e=document.getElementById(i); if(e)e.textContent=''});
+  document.querySelectorAll('#btn-now,#btn-new').forEach(b=>b.disabled=false);
+}
+function log(id,t){const e=document.getElementById(id); if(e)e.textContent=t;}
+
+function playCurrent(){
+  stopAudio(); running=true;
+  document.getElementById('btn-now').disabled=true;
+  const c=AC(); if(c.state==='suspended')c.resume();
+  /* 1. beacon 440 Hz gated at 3.2/sec, panned */
+  const b=tone(440,0,0.35);
+  let k=0;
+  const gate=setInterval(()=>{ if(!running)return clearInterval(gate);
+    const t=c.currentTime; b.g.gain.cancelScheduledValues(t);
+    b.g.gain.setValueAtTime(0.10,t); b.g.gain.exponentialRampToValueAtTime(0.001,t+0.13);
+    b.p.pan.value=0.45*Math.sin(k/4); k++;
+  },1000/3.2);
+  timers.push(gate);
+  /* 2. on-axis lock tone 660 Hz, continuous */
+  tone(660,0.035,0);
+  /* 3. radial drift earcon 220 Hz, continuous */
+  const d=tone(220,0.045,0);
+  const dr=setInterval(()=>{ if(!running)return clearInterval(dr);
+    d.o.frequency.value=220+30*Math.sin(Date.now()/1400); },90);
+  timers.push(dr);
+  /* speech at the real cooldowns — 11 sentences in 20 s */
+  const G=["You're drifting too far out. Ease inward.",
+           "You're drifting toward the Kaaba. Ease outward.",
+           "Wrong way. Turn around and keep the Kaaba on your left.",
+           "Good. You're back on the path.",
+           "You're drifting too far out. Ease inward.",
+           "Bear a little left.",
+           "Circuit 3 of seven complete."];
+  const O=["Careful, chair is close, 1.2 meters on your left.",
+           "Careful, person is close, 1.1 meters on your right.",
+           "Careful, chair is close, 0.9 meters on your left.",
+           "Careful, table is close, 1.3 meters ahead."];
+  G.forEach((t,i)=>at(i*3000,()=>{say(t);log('lognow','speech: '+t)}));
+  O.forEach((t,i)=>at(4000+i*4200,()=>{say(t);log('lognow','warning: '+t)}));
+  at(20500,()=>{stopAudio();log('lognow','— 20 s ended. That was 11 sentences over a constant tone bed.')});
+}
+
+function playProposed(){
+  stopAudio(); running=true;
+  document.getElementById('btn-new').disabled=true;
+  const c=AC(); if(c.state==='suspended')c.resume();
+  /* silence on path. earcon = two short notes, direction by pitch order + pan */
+  function earcon(up,pan,label){
+    const t=c.currentTime;
+    [0,0.09].forEach((off,n)=>{
+      const o=c.createOscillator(),g=c.createGain(),p=c.createStereoPanner();
+      o.type='sine'; o.frequency.value= up ? (n?760:560) : (n?560:760);
+      p.pan.value=pan; g.gain.value=0;
+      o.connect(g).connect(p).connect(c.destination);
+      g.gain.setValueAtTime(0.0001,t+off);
+      g.gain.exponentialRampToValueAtTime(0.12,t+off+0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+off+0.085);
+      o.start(t+off); o.stop(t+off+0.1); nodes.push({o,g,p});
+    });
+    log('lognew','earcon: '+label);
+  }
+  function haptic(label){
+    if(navigator.vibrate) navigator.vibrate(label==='obstacle'?[40,50,40,50,40]:[30]);
+    log('lognew','haptic: '+label);
+  }
+  log('lognew','on path — silence');
+  at(2200,()=>{earcon(false,-0.5,'drifting out · descending, left');haptic('correction')});
+  at(4000,()=>log('lognew','on path — silence'));
+  at(6500,()=>{earcon(false,-0.5,'still drifting')});
+  at(6900,()=>{say('Inward.',1.15);log('lognew','one word: "Inward." — error persisted 4 s')});
+  at(8600,()=>log('lognew','on path — silence'));
+  at(11000,()=>{earcon(true,0.5,'reversing · urgent');haptic('obstacle')});
+  at(11500,()=>{say('Turn around.',1.15);log('lognew','one word: "Turn around." — safety priority')});
+  at(13500,()=>log('lognew','on path — silence'));
+  at(15000,()=>{haptic('circuit');log('lognew','haptic tap: circuit complete')});
+  at(15400,()=>{say('Three.',1.1);log('lognew','one word: "Three."')});
+  at(17000,()=>log('lognew','on path — silence'));
+  at(18500,()=>{earcon(false,-0.35,'gentle drift');haptic('correction')});
+  at(20500,()=>{stopAudio();log('lognew','— 20 s ended. 3 words, 4 earcons, 4 haptics, and a lot of silence.')});
+}
+
+/* ---------- timelines ---------- */
+function drawTimelines(){
+  const now=deck.children[cur].querySelector('#tl-now');
+  const nw=deck.children[cur].querySelector('#tl-new');
+  if(!now||!nw)return;
+  const T=20000, pc=ms=>(ms/T*100);
+  now.querySelectorAll('.ev,.tone').forEach(e=>e.remove());
+  nw.querySelectorAll('.ev,.tone').forEach(e=>e.remove());
+  const bed=document.createElement('div'); bed.className='tone'; now.appendChild(bed);
+  const G=[0,3000,6000,9000,12000,15000,18000], O=[4000,8200,12400,16600];
+  [...G.map(t=>[t,2700]),...O.map(t=>[t,3400])].forEach(([t,d])=>{
+    const e=document.createElement('div'); e.className='ev sp';
+    e.style.left=pc(t)+'%'; e.style.width=Math.max(1.2,pc(d))+'%';
+    now.appendChild(e);
+  });
+  [[2200,'ec'],[6500,'ec'],[11000,'ec'],[18500,'ec'],
+   [2200,'hp'],[11000,'hp'],[15000,'hp'],[18500,'hp']]
+   .forEach(([t,k])=>{const e=document.createElement('div');e.className='ev '+k;
+    e.style.left=pc(t)+'%';e.style.width='1.1%';nw.appendChild(e);});
+  [[6900,600],[11500,900],[15400,500]].forEach(([t,d])=>{
+    const e=document.createElement('div'); e.className='ev sp';
+    e.style.left=pc(t)+'%'; e.style.width=Math.max(1.2,pc(d))+'%'; nw.appendChild(e);});
+}
+
+show(0);
+</script>
+</body>
+</html>

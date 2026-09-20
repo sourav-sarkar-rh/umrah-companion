@@ -2,6 +2,49 @@
 
 _Update this at the end of every session. Newest at top._
 
+## 2026-09-20 (session 11 — KSCDR final-submission deck; repo published)
+
+**Docs corrected, no app code changed.**
+
+- **`PRODUCT.md` was stale and is now fixed.** It still marked F4/F5/F6/F7/F17/F19/F20/F21 as
+  in-progress with "device-verify pending", and F10 as "not yet wired into `SceneVision`". All
+  false since the ~20-trial device pass. Left honestly open: F8 outdoor/sunlight tuning, F11
+  native Arabic proofing, F12 haptics/VoiceOver polish, F13 standalone proxy.
+- **Repo made public** for the hackathon submission (slide 9 asks for a code repository URL and
+  an unreachable link is scored as a missing deliverable). Secret scan over full history: clean —
+  `proxy/.env` was never committed. `ios/project.yml` carries the Apple `DEVELOPMENT_TEAM` ID and
+  `UmrahCompanionApp.swift` a LAN address; both public now, neither is a credential. The LAN IP
+  was left as-is deliberately so the demo-video setup keeps working.
+- **`README.md`** now opens with the submission identity so a judge landing from the deck sees
+  what is verified and what is not, without reading further.
+- Submission name is **Rafiq al-Umrah**; the repo and app bundle keep the old name.
+- Deck content for all 14 template slides lives in `presentation/final-submission-content.md`.
+
+**Still the real work:** the demo video (2–3 min, captions + Arabic subtitles), and the pilot.
+
+## 2026-08-28 (session 9 — toolchain only: XcodeBuildMCP re-registered, folder-scoped)
+
+**No app code changed.** Tooling session; the session-8 device-verify queue below is still the
+actual next work.
+
+- **XcodeBuildMCP had silently disappeared.** It was in NO scope of `~/.claude.json`, despite this
+  repo's `CLAUDE.md` claiming it was registered at user scope. Reinstalled v2.7.0 and registered it
+  in **`.mcp.json` in this folder** (checked in) rather than user scope — see *Toolchain setup* in
+  `CLAUDE.md` for why and for the launch requirement (`cd ~/redesign/build/umrah-companion && claude`).
+- **Install route matters:** `npm install -g` fails on this Mac (npm prefix `/usr/local` is
+  root-owned). Homebrew tap works but needs `brew trust getsentry/xcodebuildmcp` first.
+- **v2 renamed the entrypoint to `xcodebuildmcp mcp`** — old `npx -y xcodebuildmcp` configs fail
+  silently. `.mcp.json` pins `/opt/homebrew/bin/xcodebuildmcp` absolutely.
+- **Verified, not assumed:** probed the server over stdio directly — `initialize` returns
+  `xcodebuildmcp 2.7.0`, `tools/list` returns 24 tools. Xcode 26.6 active;
+  `UmrahCompanion.xcodeproj` resolves with the `UmrahCompanion` scheme; `xcodegen`, `xcbeautify`,
+  `swiftlint`, `xcode-build-server` all on PATH.
+- **Not done:** did not build the app or re-run the four logic sims this session.
+
+**Note for whoever resumes:** `context.md` used to say the known blocker was "the Xcode install
+step". That has been false since session 3 (Xcode 26.6, builds green). Corrected — the real gate is
+the human device-verify pass in session 8 below.
+
 ## 2026-07-05 (session 8 — post-test demo-hardening from Sourav's device feedback)
 Sourav tested sessions-6/7 features on-device and gave four pieces of feedback. All four addressed;
 **sim build green on iPhone 17 Pro; the four logic sims still pass. AR/audio/mic = device-verify.**

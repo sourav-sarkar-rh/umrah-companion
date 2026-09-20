@@ -19,42 +19,48 @@ talk "what's around me?" → spoken scene description.
 ## Feature list & status
 Legend: ✅ done · 🟡 in progress · ⬜ todo · 🔮 later (post-demo)
 
+_Status re-checked 2026-09-20 against the actual device-verify pass. Every core feature below
+except the web portal was verified on iPhone 16 Pro across ~20 trials with friends and
+co-workers. This list had been stale since 2026-07-05._
+
 ### Core demo (v0 — "works on my phone")
 - ✅ **F1 Cloud scene-description proxy** — FastAPI, mock+Claude/Gemini/OpenAI, tested.
 - ✅ **F2 Tawaf circuit counter** (`TawafTracker`) — verified by simulation (7 loops → 7 circuits).
 - ✅ **F3 App shell & demo UI** — SwiftUI screen, circuit ring, buttons. Builds + renders on sim (overlay, status banner, language menu, action button verified by screenshot).
-- 🟡 **F4 ARKit session + center-mark raycast** — mark the table as center (scaffolded).
-- 🟡 **F5 On-device obstacle detection + LiDAR distance** — Vision human detector + depth (scaffolded).
-- 🟡 **F6 Voice I/O** — on-device STT (push-to-talk) + TTS narration (scaffolded).
-- 🟡 **F7 First build** — Xcode 26.6 (Swift 6.3.3, iOS 26.5 SDK); full app **compiles + runs on the iPhone 17 Pro / iOS 26.5 simulator** (Build Succeeded, signed). Device destination ("Sourav's iPhone") now eligible after `xcodebuild -downloadPlatform iOS`; `DEVELOPMENT_TEAM` set. Device build (real AR + first-launch permissions) still pending — that's the human's leg.
-- ⬜ **F8 On-device tuning** — circuit threshold at table radius; obstacle cadence; tracking-loss UX.
-- 🟡 **F17 Tawaf circle-guidance (blind-usable)** — `TawafGuide` (pure, 9/9 headless tests) reports
+- ✅ **F4 ARKit session + center-mark raycast** — mark the table as center. Device-verified.
+- ✅ **F5 On-device obstacle detection + LiDAR distance** — Vision human detector + depth. Device-verified.
+- ✅ **F6 Voice I/O** — on-device STT (push-to-talk) + TTS narration. Device-verified.
+- ✅ **F7 First build** — Xcode 26.6 (Swift 6.3.3, iOS 26.5 SDK); full app **compiles + runs on the iPhone 17 Pro / iOS 26.5 simulator** (Build Succeeded, signed). Device destination ("Sourav's iPhone") now eligible after `xcodebuild -downloadPlatform iOS`; `DEVELOPMENT_TEAM` set. Device build done — runs on iPhone 16 Pro.
+- 🟡 **F8 On-device tuning** — indoor tuning done across ~20 trials. **Outdoor/sunlight tuning still
+  to do** (time-of-flight depth degrades in direct sun), and obstacle ranking in dense crowds needs
+  work — the depth field reads as one continuous surface rather than discrete obstacles.
+- ✅ **F17 Tawaf circle-guidance (blind-usable)** — `TawafGuide` (pure, 9/9 headless tests) reports
   on-path / drifting-in / drifting-out / reversing + a signed steer + on-axis flag + radius error,
   learning the orbit radius from the first steps. `GuidanceAudio` synthesises a Soundscape-style
   panned beacon + on-axis confirmation tone + a separate radial-drift earcon (no audio assets).
   Terse egocentric spoken corrections. OFF by default, toggle in the top bar, auto-pauses while the
   mic listens. **DEVICE-VERIFIED on iPhone 16 Pro (2026-07-05): drift-out → "ease inward", drift-in
   toward the Kaaba → "ease outward" both fire correctly.** Beacon-tone tuning still to taste.
-- 🟡 **F19 Sa'i as a ritual mode** — Tawaf and Sa'i share one screen (a MODE switch, not a nav stack —
+- ✅ **F19 Sa'i as a ritual mode** — Tawaf and Sa'i share one screen (a MODE switch, not a nav stack —
   blind-hostile navigation avoided). Idle screen selects the ritual; Sa'i marks Safa + Marwah (two AR
   pillars), wires the tested `SaiTracker`, announces each length + turn-around, ring shows lengths/7,
-  linear beacon guidance toward the endpoint. Builds green; AR walk device-verify.
-- 🟡 **F20 Voice command layer** — one entry point (mic button · double-tap anywhere · VoiceOver
+  linear beacon guidance toward the endpoint. **Device-verified.**
+- ✅ **F20 Voice command layer** — one entry point (mic button · double-tap anywhere · VoiceOver
   magic-tap). `VoiceCommands` pure on-device intent matcher (fixed grammar, EN/AR/UR, 21/21 tests):
   select tawaf/sai, mark, reset, describe, guidance, mute, du'a, count, help. Non-commands fall
-  through to the on-device scene answer. Spoken confirmations. Builds green; mic device-verify.
-- 🟡 **F21 Du'a guidance (optional)** — Off / Prompt / Recite, default OFF, top-bar button + voice.
+  through to the on-device scene answer. Spoken confirmations. **Device-verified.**
+- ✅ **F21 Du'a guidance (optional)** — Off / Prompt / Recite, default OFF, top-bar button + voice.
   Non-prescriptive; **safety always interrupts a recitation**. Short authentic phrase (reciter audio
-  to replace TTS in production). Builds green; device-verify.
-- 🟡 **F9 Live cloud path** — Anthropic key in `proxy/.env`; proxy→Claude verified live (English + Arabic). Phone→proxy leg pending F7.
+  to replace TTS in production). **Device-verified, including the safety interrupt.**
+- ✅ **F9 Live cloud path** — proxy→Claude verified live (English + Arabic); phone→proxy leg verified on device. Requires the proxy running on the LAN (see `proxy/README.md`); with no key the proxy runs in mock mode.
 
 ### Polish (v0.1 — nicer demo)
-- 🟡 **F10 YOLO object detection** — YOLOv8n **converted to Core ML** (`ios/models/yolov8n.mlpackage`, 80 COCO classes, on-device). Not yet added to the project / wired into `SceneVision` + HUD — that's the next build (Batch B).
-- 🟡 **F15 Virtual Kaaba in AR** — black cube + gold kiswa band anchored at the marked center (`DemoTuning.kaabaSizeM`). Compiles; device-verify pending.
-- 🟡 **F16 LiDAR debug/"Terminator" view** — toggle shows the live scene-reconstruction mesh + feature points (`showSceneUnderstanding`). Compiles; device-verify pending.
+- ✅ **F10 YOLO object detection** — YOLOv8n converted to Core ML (`ios/models/yolov8n.mlpackage`, 80 COCO classes, on-device), wired into `SceneVision` with Apple's Vision human detector as fallback; each detection ranged by the LiDAR depth map. Device-verified. Note: this is the stock COCO model, **not** a Hajj-specific dataset — crowd detection rides the COCO `person` class.
+- ✅ **F15 Virtual Kaaba in AR** — black cube + gold kiswa band anchored at the marked center (`DemoTuning.kaabaSizeM`). Device-verified.
+- ✅ **F16 LiDAR debug/"Terminator" view** — toggle shows the live scene-reconstruction mesh + feature points (`showSceneUnderstanding`). Device-verified.
 - 🟡 **F11 Multi-language, ground-up** — runtime language switch (English/Arabic/Urdu) flips UI text,
   voice (TTS/STT locale), cloud replies, **right-to-left layout**, and Arabic-Indic numerals. Arabic
-  strings written for demo (need native proofing). `Localization/Localization.swift`.
+  strings written for demo — **still need native Arabic proofing**. `Localization/Localization.swift`.
 - ✅ **F14 Branding & graphics** — app icon (Kaaba + voice rings, gold/teal) + `LaunchView` splash both render on sim (verified by screenshot). Native-proof Arabic on device.
 - ⬜ **F12 Haptics & VoiceOver polish** — milestone haptics, full screen-reader pass.
 - ⬜ **F13 Standalone proxy** — deploy proxy to a small cloud host so the phone needs no laptop.

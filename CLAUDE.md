@@ -47,11 +47,11 @@ with no Xcode:
 Keep new business logic behind this line so we can regression-test it here. Treat "I can't unit
 test it, it needs the phone" as a signal to move logic OUT of the AR/UI layer.
 
-## AI-assisted iOS workflow (once Xcode is installed) — verified 2026 best practice
+## AI-assisted iOS workflow — verified 2026 best practice
 The agent NEVER opens Xcode. It builds/tests headlessly and reads parsed output.
 - **Build (sim):** `xcodebuild -project ios/UmrahCompanion.xcodeproj -scheme UmrahCompanion -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build | xcbeautify`
 - **Test (sim):** `xcodebuild test -scheme UmrahCompanion -destination 'platform=iOS Simulator,name=iPhone 16 Pro' | xcbeautify`
-- **See non-AR UI:** boot sim + `xcrun simctl io booted screenshot out.png`, or use the **XcodeBuildMCP** tools (build/run/test/screenshot as structured calls — registered in Claude Code, user scope).
+- **See non-AR UI:** boot sim + `xcrun simctl io booted screenshot out.png`, or use the **XcodeBuildMCP** tools (build/run/test/screenshot as structured calls — see *Toolchain setup* below).
 - **Diagnostics:** `xcode-build-server config -project ios/UmrahCompanion.xcodeproj -scheme UmrahCompanion` (generates buildServer.json → sourcekit-lsp project-wide errors). `swiftlint` for style.
 - **Device build/run:** needs signing → the human. `-destination 'platform=iOS,id=<UDID>'`.
 
@@ -62,7 +62,7 @@ The agent NEVER opens Xcode. It builds/tests headlessly and reads parsed output.
 4. Device signing/provisioning, first-launch permission taps (camera/mic/speech/local-network), and judging AR spatial correctness are ALWAYS the human's job.
 
 ## Backlog to raise AI leverage (ranked, from the 2026 research — see git/chat)
-1. ✅ XcodeBuildMCP added to Claude Code · ✅ xcbeautify / xcode-build-server / swiftlint installed.
+1. ✅ XcodeBuildMCP registered (this folder only — see *Toolchain setup*) · ✅ xcbeautify / xcode-build-server / swiftlint installed.
 2. ⬜ Factor pure logic into a local SPM package `UmrahCore` (TawafTracker, Localization, models) so it
    runs under `swift test` + gets sourcekit-lsp for free; app target depends on it via XcodeGen.
 3. ⬜ Extend protocol boundaries (`PositionSource`, `ObstacleSource`) so obstacle/voice logic is
@@ -71,6 +71,36 @@ The agent NEVER opens Xcode. It builds/tests headlessly and reads parsed output.
 5. ⬜ Thin GitHub Actions (`macos-26`, no signing): `swift test` + `pytest` + snapshots on push.
 6. ⬜ Record one ARKit position/depth fixture during a device session → replay headlessly forever.
 7. Inject/InjectionIII + SwiftUI Previews = for SOURAV's device-tuning (F8), not the agent.
+
+## Toolchain setup (verified 2026-08-28)
+
+**XcodeBuildMCP is scoped to THIS FOLDER, not user scope.** It is registered in
+`.mcp.json` in this directory (checked in). Consequences:
+
+- **Start sessions from here** — `cd ~/redesign/build/umrah-companion && claude`. Started from
+  `redesign/` root (the RH workspace) the MCP is NOT loaded; Claude Code only reads `.mcp.json`
+  from the directory it launches in. Claude Code prompts once per machine to approve the server.
+- **Why folder-scoped:** user scope would add the server's tools to every Redesign Health session,
+  where MCP-registry truncation is already a live problem. This is a personal build — it must not
+  cost RH sessions anything.
+- **Install:** Homebrew, `brew tap getsentry/xcodebuildmcp && brew trust getsentry/xcodebuildmcp &&
+  brew install xcodebuildmcp` → `/opt/homebrew/bin/xcodebuildmcp` (v2.7.0). `npm install -g` does
+  NOT work on this Mac — npm's prefix is `/usr/local`, root-owned. `brew trust` is required; the tap
+  is Sentry's own (github.com/getsentry/XcodeBuildMCP).
+- **v2 renamed the entrypoint:** the server is `xcodebuildmcp mcp`. A bare `npx -y xcodebuildmcp`
+  (the v1 form, still in old notes) silently fails to start. `.mcp.json` pins the absolute binary
+  path, so there is no npx cold start and no network dependency at launch.
+- **The MCP is optional.** v2 also installs a full CLI on PATH (`xcodebuildmcp tools` lists ~100
+  commands, e.g. `xcodebuildmcp simulator build --scheme UmrahCompanion`). That works from ANY
+  directory via plain Bash, so a session at `redesign/` root can still build, test, boot sims and
+  screenshot — it just lacks the structured tool calls. The MCP server itself exposes ~24 tools.
+- **Verify it's alive** without launching a session:
+  `xcodebuildmcp --version` and `xcodebuildmcp tools | head`.
+
+**Environment as of 2026-08-28:** Xcode 26.6 (build 17F113), active at
+`/Applications/Xcode.app/Contents/Developer`. `xcodegen`, `xcbeautify`, `swiftlint`,
+`xcode-build-server` all present at `/opt/homebrew/bin`. `UmrahCompanion.xcodeproj` exists with the
+single scheme `UmrahCompanion`.
 
 ## Guardrails (project-specific)
 - **On-device first.** Never stream video to the cloud. Only structured observations + at most ONE
